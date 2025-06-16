@@ -219,7 +219,7 @@ function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white" style={{ zoom: '0.9' }}>
       {/* Enhanced Hero Section */}
       <section className="relative min-h-screen flex flex-col overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-green-800 to-teal-900"></div>
