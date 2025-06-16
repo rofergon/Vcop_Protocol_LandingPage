@@ -58,11 +58,11 @@ export const DevaluationCalculator: React.FC<DevaluationCalculatorProps> = ({ cl
   const handleAmountChange = (value: string) => {
     const numValue = Number(value);
     if (numValue < 0) {
-      setInputError("El monto no puede ser negativo");
+      setInputError("Amount cannot be negative");
       return;
     }
     if (numValue > 100000000000) { // 100 billion max
-      setInputError("El monto es demasiado grande");
+      setInputError("Amount is too large");
       return;
     }
     setInputError(null);
