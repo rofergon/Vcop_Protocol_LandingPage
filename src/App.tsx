@@ -50,11 +50,11 @@ function App() {
     { value: "62%", label: "Purchasing Power Lost", color: "text-yellow-400" }
   ];
 
-  const liveMetrics = [
-    { label: "Current COP/USD", value: "4,247", change: "+0.8%", trend: "up" as const },
-    { label: "VCOP Stability", value: "99.98%", change: "±0.02%", trend: "stable" as const },
-    { label: "Protocol TVL", value: "$2.1M", change: "+12.3%", trend: "up" as const },
-    { label: "Active Loans", value: "1,247", change: "+5.2%", trend: "up" as const }
+  const liveMetrics: Array<{ label: string; value: string; change: string; trend: "up" | "down" | "stable" }> = [
+    { label: "Current COP/USD", value: "4,100", change: "+0.5%", trend: "up" },
+    { label: "BTC/USD", value: "$104,000", change: "+2.1%", trend: "up" },
+    { label: "ETH/USD", value: "$2,600", change: "+1.8%", trend: "up" },
+    { label: "VCOP Stability", value: "99.98%", change: "±0.02%", trend: "stable" }
   ];
 
   useEffect(() => {
@@ -71,11 +71,14 @@ function App() {
   useEffect(() => {
     const interval = setInterval(() => {
       setAnimatedValue(prev => {
-        const target = currentStat === 0 ? 2600 : currentStat === 1 ? 4200 : 62;
+        const baseTarget = currentStat === 0 ? 2600 : currentStat === 1 ? 4150 : 62;
+        // Add small random variation for the 4100-4200 range
+        const randomVariation = currentStat === 1 ? (Math.random() - 0.5) * 100 : 0;
+        const target = baseTarget + randomVariation;
         const diff = target - prev;
-        return prev + (diff * 0.1);
+        return prev + (diff * 0.02); // Much slower animation (was 0.1, now 0.02)
       });
-    }, 50);
+    }, 200); // Much slower interval (was 50ms, now 200ms)
     return () => clearInterval(interval);
   }, [currentStat]);
 
@@ -218,120 +221,204 @@ function App() {
   return (
     <div className="min-h-screen bg-white">
       {/* Enhanced Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      <section className="relative min-h-screen flex flex-col overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-green-800 to-teal-900"></div>
         <div className="absolute inset-0 bg-black/20"></div>
         
-        {/* Enhanced Background Pattern */}
+        {/* Enhanced Background Pattern - Responsive */}
         <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-96 h-96 bg-white rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
-          <div className="absolute top-40 right-20 w-80 h-80 bg-emerald-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-1000"></div>
-          <div className="absolute -bottom-8 left-40 w-72 h-72 bg-teal-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-2000"></div>
-          <div className="absolute top-1/2 right-1/3 w-64 h-64 bg-yellow-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-3000"></div>
+          <div className="absolute top-10 md:top-20 left-4 md:left-20 w-48 h-48 md:w-96 md:h-96 bg-white rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
+          <div className="absolute top-20 md:top-40 right-4 md:right-20 w-32 h-32 md:w-80 md:h-80 bg-emerald-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-1000"></div>
+          <div className="absolute -bottom-4 md:-bottom-8 left-20 md:left-40 w-40 h-40 md:w-72 md:h-72 bg-teal-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-2000"></div>
+          <div className="absolute top-1/2 right-1/4 md:right-1/3 w-32 h-32 md:w-64 md:h-64 bg-yellow-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-3000"></div>
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className={`transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <div className="mb-6">
-              <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                <Globe className="w-4 h-4 mr-2" />
-                Live on Base Sepolia • Mainnet Q1 2025
-              </span>
-            </div>
-            
-            <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
-              Keep Your <span className="text-emerald-400 relative">
-                Crypto
-                <div className="absolute -inset-1 bg-emerald-400/20 blur-lg rounded-lg"></div>
-              </span>
-              <br />
-              Spend in <span className="text-yellow-400 relative">
-                Pesos
-                <div className="absolute -inset-1 bg-yellow-400/20 blur-lg rounded-lg"></div>
-              </span>
-            </h1>
-            
-            <p className="text-xl md:text-2xl text-emerald-100 mb-8 max-w-4xl mx-auto leading-relaxed">
-              The first DeFi protocol designed for Latin America. Hedge against devaluation without selling your crypto.
-            </p>
-            
-            {/* Enhanced Animated Stats */}
-            <div className="mb-12">
-              <div className="bg-black/30 backdrop-blur-lg rounded-2xl p-8 max-w-lg mx-auto border border-emerald-500/30 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-yellow-500/10"></div>
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="text-sm text-emerald-300">Live Data</div>
-                    <button 
-                      onClick={() => setIsPlaying(!isPlaying)}
-                      className="text-emerald-300 hover:text-white transition-colors"
-                    >
-                      {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  <div className={`text-4xl md:text-5xl font-bold mb-2 transition-colors duration-500 ${stats[currentStat].color}`}>
-                    {currentStat === 2 ? `${Math.round(animatedValue)}%` : Math.round(animatedValue).toLocaleString()}
-                  </div>
-                  <div className="text-emerald-300 text-lg mb-4">
-                    {stats[currentStat].label}
-                  </div>
-                  <div className="flex justify-center space-x-2">
-                    {stats.map((_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setCurrentStat(index)}
-                        className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                          index === currentStat ? 'bg-emerald-400 w-6' : 'bg-emerald-400/30'
-                        }`}
-                      />
-                    ))}
+        {/* Main Content Container - Responsive Layout */}
+        <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-8 sm:py-12 md:py-16 lg:py-20">
+          <div className="w-full max-w-7xl mx-auto text-center">
+            <div className={`transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              
+              {/* Badge - Responsive */}
+              <div className="mb-4 md:mb-6">
+                <span className="inline-flex items-center px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <Globe className="w-3 h-3 md:w-4 md:h-4 mr-1.5 md:mr-2" />
+                  <span className="hidden sm:inline">Live on Base Sepolia • Mainnet Q1 2025</span>
+                  <span className="sm:hidden">Live on Base • Q1 2025</span>
+                </span>
+              </div>
+              
+              {/* Main Title - Mobile First Responsive */}
+              <h1 className="font-bold text-white mb-4 md:mb-6 leading-tight
+                text-3xl 
+                xs:text-4xl 
+                sm:text-5xl 
+                md:text-6xl 
+                lg:text-7xl 
+                xl:text-8xl
+                2xl:text-9xl">
+                Keep Your <span className="text-emerald-400 relative inline-block">
+                  Crypto
+                  <div className="absolute -inset-1 bg-emerald-400/20 blur-lg rounded-lg"></div>
+                </span>
+                <br />
+                Spend in <span className="text-yellow-400 relative inline-block">
+                  Pesos
+                  <div className="absolute -inset-1 bg-yellow-400/20 blur-lg rounded-lg"></div>
+                </span>
+              </h1>
+              
+              {/* Subtitle - Responsive Typography */}
+              <p className="text-emerald-100 mb-6 md:mb-8 mx-auto leading-relaxed max-w-xs sm:max-w-lg md:max-w-2xl lg:max-w-4xl
+                text-sm 
+                sm:text-base 
+                md:text-lg 
+                lg:text-xl 
+                xl:text-2xl">
+                The first DeFi protocol designed for Latin America. Hedge against devaluation without selling your crypto.
+              </p>
+              
+              {/* Enhanced Animated Stats - Responsive Container */}
+              <div className="mb-6 md:mb-8">
+                <div className="bg-black/30 backdrop-blur-lg rounded-xl md:rounded-2xl border border-emerald-500/30 relative overflow-hidden mx-auto
+                  p-4 max-w-xs
+                  sm:p-5 sm:max-w-sm
+                  md:p-6 md:max-w-md
+                  lg:p-8 lg:max-w-lg">
+                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-yellow-500/10"></div>
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-3 md:mb-4">
+                      <div className="text-xs md:text-sm text-emerald-300">Live Data</div>
+                      <button 
+                        onClick={() => setIsPlaying(!isPlaying)}
+                        className="text-emerald-300 hover:text-white transition-colors"
+                      >
+                        {isPlaying ? <Pause className="w-3 h-3 md:w-4 md:h-4" /> : <Play className="w-3 h-3 md:w-4 md:h-4" />}
+                      </button>
+                    </div>
+                    <div className={`font-bold mb-2 transition-colors duration-500 ${stats[currentStat].color}
+                      text-2xl
+                      sm:text-3xl
+                      md:text-4xl
+                      lg:text-5xl`}>
+                      {currentStat === 2 ? `${Math.round(animatedValue)}%` : Math.round(animatedValue).toLocaleString()}
+                    </div>
+                    <div className="text-emerald-300 mb-3 md:mb-4
+                      text-sm
+                      md:text-base
+                      lg:text-lg">
+                      {stats[currentStat].label}
+                    </div>
+                    <div className="flex justify-center space-x-2">
+                      {stats.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setCurrentStat(index)}
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            index === currentStat ? 'bg-emerald-400 w-6' : 'bg-emerald-400/30 w-2'
+                          }`}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Live Metrics Bar */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12 max-w-4xl mx-auto">
-              {liveMetrics.map((metric, index) => (
-                <div key={index} className="bg-black/20 backdrop-blur-sm rounded-lg p-4 border border-white/10">
-                  <div className="text-xs text-emerald-300 mb-1">{metric.label}</div>
-                  <div className="text-lg font-bold text-white">{metric.value}</div>
-                  <div className={`text-xs flex items-center ${
-                    metric.trend === 'up' ? 'text-green-400' : 
-                    metric.trend === 'down' ? 'text-red-400' : 'text-yellow-400'
-                  }`}>
-                    {metric.trend === 'up' && <TrendingUp className="w-3 h-3 mr-1" />}
-                    {metric.trend === 'down' && <TrendingDown className="w-3 h-3 mr-1" />}
-                    {metric.trend === 'stable' && <Activity className="w-3 h-3 mr-1" />}
-                    {metric.change}
+              {/* Live Metrics Bar - Progressive Responsive Grid */}
+              <div className="mb-6 md:mb-8 mx-auto
+                grid gap-2 max-w-xs grid-cols-1
+                xs:gap-3 xs:max-w-sm xs:grid-cols-2
+                sm:max-w-2xl
+                md:gap-4 md:max-w-3xl md:grid-cols-4
+                lg:max-w-4xl">
+                {liveMetrics.map((metric, index) => (
+                  <div key={index} className="bg-black/20 backdrop-blur-sm rounded-lg border border-white/10
+                    p-2.5
+                    sm:p-3
+                    lg:p-4">
+                    <div className="text-xs text-emerald-300 mb-1 truncate">{metric.label}</div>
+                    <div className="font-bold text-white
+                      text-sm
+                      sm:text-base
+                      lg:text-lg">{metric.value}</div>
+                    <div className={`text-xs flex items-center ${
+                      metric.trend === 'up' ? 'text-green-400' : 
+                      metric.trend === 'down' ? 'text-red-400' : 'text-yellow-400'
+                    }`}>
+                      {metric.trend === 'up' && <TrendingUp className="w-3 h-3 mr-1 flex-shrink-0" />}
+                      {metric.trend === 'down' && <TrendingDown className="w-3 h-3 mr-1 flex-shrink-0" />}
+                      {metric.trend === 'stable' && <Activity className="w-3 h-3 mr-1 flex-shrink-0" />}
+                      <span className="truncate">{metric.change}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <button className="group bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-4 px-8 rounded-full text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-2xl flex items-center gap-2 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-teal-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="relative flex items-center gap-2">
-                  <Zap className="w-5 h-5" />
-                  Launch App
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </button>
-              <button className="border-2 border-white text-white hover:bg-white hover:text-emerald-900 font-semibold py-4 px-8 rounded-full text-lg transition-all duration-300 flex items-center gap-2">
-                <Eye className="w-5 h-5" />
-                View Documentation
-              </button>
+              {/* CTA Buttons - Stack on Mobile, Inline on Desktop */}
+              <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center items-center max-w-lg mx-auto">
+                <a 
+                  href="https://vcop-lime.vercel.app/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="group bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-2xl flex items-center gap-2 relative overflow-hidden w-full sm:w-auto justify-center
+                    py-3 px-6 text-base
+                    md:py-4 md:px-8 md:text-lg"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-teal-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="relative flex items-center gap-2">
+                    <Zap className="w-4 h-4 md:w-5 md:h-5" />
+                    Launch App
+                    <ArrowRight className="w-4 h-4 md:w-5 md:h-5 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </a>
+                <a 
+                  href="https://saritus-organization.gitbook.io/docs-vcop-protocol" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="border-2 border-white text-white hover:bg-white hover:text-emerald-900 font-semibold rounded-full transition-all duration-300 flex items-center gap-2 w-full sm:w-auto justify-center
+                    py-3 px-6 text-base
+                    md:py-4 md:px-8 md:text-lg"
+                >
+                  <Eye className="w-4 h-4 md:w-5 md:h-5" />
+                  <span className="hidden sm:inline">View Documentation</span>
+                  <span className="sm:hidden">Documentation</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Enhanced Scroll Indicator */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-white animate-bounce">
-          <div className="flex flex-col items-center">
-            <div className="text-sm text-emerald-300 mb-2">Scroll to explore</div>
-            <ChevronDown className="w-8 h-8" />
+        {/* Enhanced Scroll Indicator - Responsive & Accessible */}
+        <div className="relative z-10 flex-shrink-0 pb-4 md:pb-6 lg:pb-8">
+          <div className="flex flex-col items-center text-white animate-bounce">
+            <div className="text-xs md:text-sm text-emerald-300 mb-1 md:mb-2">Scroll to explore</div>
+            <ChevronDown className="w-5 h-5 md:w-6 md:h-6 lg:w-8 lg:h-8" />
           </div>
+        </div>
+      </section>
+
+      {/* Interactive Loan Demo Section */}
+      <section className="py-20 bg-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 to-teal-50 opacity-50"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-emerald-100 text-emerald-800 border border-emerald-200 mb-6">
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Experience the Solution
+            </div>
+            
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+              Try VCOP's <span className="text-emerald-600 relative">
+                Ultra-Flexible Engine
+                <div className="absolute bottom-0 left-0 w-full h-1 bg-emerald-600/30"></div>
+              </span>
+            </h2>
+            
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed mb-12">
+              Experience our revolutionary lending system that allows ANY ratio - even beyond 100% LTV! See how VCOP breaks traditional DeFi limitations while providing intelligent risk insights.
+            </p>
+          </div>
+
+          <InteractiveLoanDemo />
         </div>
       </section>
 
@@ -358,32 +445,6 @@ function App() {
           </div>
 
           <DevaluationCalculator />
-        </div>
-      </section>
-
-      {/* Interactive Loan Demo Section */}
-      <section className="py-20 bg-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 to-teal-50 opacity-50"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-emerald-100 text-emerald-800 border border-emerald-200 mb-6">
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Experience the Solution
-            </div>
-            
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-              Try VCOP's <span className="text-emerald-600 relative">
-                Risk Engine
-                <div className="absolute bottom-0 left-0 w-full h-1 bg-emerald-600/30"></div>
-              </span>
-            </h2>
-            
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed mb-12">
-              Experience our real-time risk calculator with live scenarios. See how different loan parameters affect your position safety.
-            </p>
-          </div>
-
-          <InteractiveLoanDemo />
         </div>
       </section>
 
@@ -694,10 +755,15 @@ function App() {
                 </div>
                 
                 <div className="flex flex-col sm:flex-row gap-4 mt-8">
-                  <button className="bg-emerald-500 hover:bg-emerald-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center gap-2">
+                  <a 
+                    href="https://vcop-lime.vercel.app/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="bg-emerald-500 hover:bg-emerald-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center gap-2"
+                  >
                     <PieChart className="w-5 h-5" />
                     Start Earning
-                  </button>
+                  </a>
                   <button className="border border-emerald-500 text-emerald-400 hover:bg-emerald-500 hover:text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center gap-2">
                     <Calculator className="w-5 h-5" />
                     Calculate Yields
@@ -843,18 +909,28 @@ function App() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-            <button className="group bg-white hover:bg-gray-100 text-emerald-600 font-bold py-4 px-8 rounded-full text-lg transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-2 relative overflow-hidden">
+            <a 
+              href="https://vcop-lime.vercel.app/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="group bg-white hover:bg-gray-100 text-emerald-600 font-bold py-4 px-8 rounded-full text-lg transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-2 relative overflow-hidden"
+            >
               <div className="absolute inset-0 bg-gradient-to-r from-emerald-50 to-teal-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative flex items-center gap-2">
                 <Zap className="w-5 h-5" />
                 Try VCOP App
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </div>
-            </button>
-            <button className="border-2 border-white text-white hover:bg-white hover:text-emerald-600 font-semibold py-4 px-8 rounded-full text-lg transition-all duration-300 flex items-center justify-center gap-2">
+            </a>
+            <a 
+              href="https://saritus-organization.gitbook.io/docs-vcop-protocol" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="border-2 border-white text-white hover:bg-white hover:text-emerald-600 font-semibold py-4 px-8 rounded-full text-lg transition-all duration-300 flex items-center justify-center gap-2"
+            >
               <Eye className="w-5 h-5" />
               Read Documentation
-            </button>
+            </a>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12 text-emerald-100">
@@ -904,7 +980,7 @@ function App() {
             <div>
               <h4 className="font-semibold mb-4 text-emerald-400">Protocol</h4>
               <ul className="space-y-3 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors flex items-center"><ArrowUpRight className="w-4 h-4 mr-2" />Documentation</a></li>
+                <li><a href="https://saritus-organization.gitbook.io/docs-vcop-protocol" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors flex items-center"><ArrowUpRight className="w-4 h-4 mr-2" />Documentation</a></li>
                 <li><a href="#" className="hover:text-white transition-colors flex items-center"><Shield className="w-4 h-4 mr-2" />Security</a></li>
                 <li><a href="#" className="hover:text-white transition-colors flex items-center"><CheckCircle className="w-4 h-4 mr-2" />Audit Reports</a></li>
                 <li><a href="#" className="hover:text-white transition-colors flex items-center"><Globe className="w-4 h-4 mr-2" />GitHub</a></li>

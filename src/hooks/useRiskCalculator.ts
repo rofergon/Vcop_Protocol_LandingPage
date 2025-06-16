@@ -1,19 +1,22 @@
 import { useMemo } from 'react';
 
-// Risk levels enum (matching RiskCalculator.sol)
+// Risk levels enum (matching RiskCalculator.sol but adapted for ultra-flexible system)
 export enum RiskLevel {
-  HEALTHY = 'HEALTHY',     // > 200%
-  WARNING = 'WARNING',     // 150% - 200%
-  DANGER = 'DANGER',       // 120% - 150%
-  CRITICAL = 'CRITICAL',   // 110% - 120%
-  LIQUIDATABLE = 'LIQUIDATABLE' // < 110%
+  ULTRA_SAFE = 'ULTRA_SAFE',       // > 300%
+  HEALTHY = 'HEALTHY',             // 200% - 300%
+  MODERATE = 'MODERATE',           // 150% - 200%
+  AGGRESSIVE = 'AGGRESSIVE',       // 110% - 150%
+  EXTREME = 'EXTREME',             // 101% - 110%
+  DANGER_ZONE = 'DANGER_ZONE'     // ≤ 100% (technically liquidatable but system allows it)
 }
 
-// Risk thresholds (6 decimal precision, matching contract)
+// Risk thresholds adapted for FlexibleLoanManager (ultra-flexible)
+const ULTRA_SAFE_RATIO = 3000000;   // 300%
 const HEALTHY_RATIO = 2000000;      // 200%
-const WARNING_RATIO = 1500000;      // 150%
-const DANGER_RATIO = 1200000;       // 120%
-const CRITICAL_RATIO = 1100000;     // 110%
+const MODERATE_RATIO = 1500000;     // 150%
+const AGGRESSIVE_RATIO = 1100000;   // 110%
+const EXTREME_RATIO = 1010000;      // 101%
+// Note: System allows even ratios below 100%!
 
 // Mock price data (in a real implementation, this would come from oracles)
 const MOCK_PRICES = {
@@ -31,49 +34,50 @@ const ASSET_VOLATILITY = {
   'VCOP': 0.02,   // 2%
 } as const;
 
-// Asset configurations (matching FlexibleAssetHandler.sol suggestions)
-const ASSET_CONFIGS = {
+// Asset configurations - These are SUGGESTIONS ONLY (not enforced by FlexibleAssetHandler)
+const ASSET_SUGGESTIONS = {
   'ETH': {
-    collateralRatio: 1500000,    // 150% (suggestion)
-    liquidationRatio: 1100000,   // 110%
-    maxLoanAmount: '1000000',    // 1M USD equivalent
+    suggestedCollateralRatio: 1500000,    // 150% (just a suggestion)
+    suggestedLiquidationRatio: 1100000,   // 110% (just a suggestion)
+    maxLoanAmount: '1000000',             // This IS enforced
   },
   'WBTC': {
-    collateralRatio: 1500000,    // 150%
-    liquidationRatio: 1100000,   // 110%
-    maxLoanAmount: '2000000',    // 2M USD equivalent
+    suggestedCollateralRatio: 1500000,    // 150% (just a suggestion)
+    suggestedLiquidationRatio: 1100000,   // 110% (just a suggestion)
+    maxLoanAmount: '2000000',             // This IS enforced
   },
   'USDC': {
-    collateralRatio: 1200000,    // 120%
-    liquidationRatio: 1050000,   // 105%
-    maxLoanAmount: '5000000',    // 5M USD
+    suggestedCollateralRatio: 1200000,    // 120% (just a suggestion)
+    suggestedLiquidationRatio: 1050000,   // 105% (just a suggestion)
+    maxLoanAmount: '5000000',             // This IS enforced
   },
   'VCOP': {
-    collateralRatio: 1200000,    // 120%
-    liquidationRatio: 1050000,   // 105%
-    maxLoanAmount: '10000000',   // 10M USD (mintable)
+    suggestedCollateralRatio: 1200000,    // 120% (just a suggestion)
+    suggestedLiquidationRatio: 1050000,   // 105% (just a suggestion)
+    maxLoanAmount: '10000000',            // This IS enforced (mintable)
   }
 } as const;
 
 export interface RiskMetrics {
-  collateralizationRatio: number;    // Current collateral ratio (6 decimals)
-  liquidationThreshold: number;      // Liquidation threshold (6 decimals)
-  healthFactor: number;              // Health factor (6 decimals, 1.0 = 1000000)
-  maxWithdrawable: number;          // Max collateral withdrawable
-  maxBorrowable: number;            // Max additional borrowable (USD value)
-  liquidationPrice: number;         // Price at which position gets liquidated
-  riskLevel: RiskLevel;             // Current risk level
-  timeToLiquidation: number;        // Estimated time to liquidation (hours)
-  isLiquidatable: boolean;          // Can be liquidated now
-  priceDropToLiquidation: number;   // % price drop needed for liquidation
-  volatilityRisk: number;           // Annualized volatility
+  collateralizationRatio: number;        // Current collateral ratio (6 decimals)
+  suggestedLiquidationThreshold: number; // SUGGESTED liquidation threshold (6 decimals)
+  healthFactor: number;                  // Health factor (6 decimals, 1.0 = 1000000)
+  maxWithdrawableByMath: number;         // Max withdrawable by pure math (could be all)
+  maxBorrowableByLiquidity: number;      // Max borrowable limited only by liquidity
+  theoreticalLiquidationPrice: number;   // Price at which SUGGESTED liquidation occurs
+  riskLevel: RiskLevel;                  // Current risk level
+  timeToSuggestedLiquidation: number;    // Time to reach suggested liquidation (hours)
+  isTheoreticallyLiquidatable: boolean;  // Would be liquidatable under suggested rules
+  priceDropToSuggestedLiquidation: number; // % price drop to suggested liquidation
+  volatilityRisk: number;                // Annualized volatility
+  systemFlexibilityNote: string;         // Warning about system flexibility
 }
 
 export interface PriceImpact {
-  priceDropFor10PercentLiquidation: number;  // Price drop for 10% liquidation risk
-  priceDropFor50PercentLiquidation: number;  // Price drop for 50% liquidation risk
-  priceDropFor90PercentLiquidation: number;  // Price drop for 90% liquidation risk
-  currentVolatility: number;                 // Estimated price volatility
+  priceDropFor10PercentRisk: number;     // Price drop for 10% of suggested liquidation
+  priceDropFor50PercentRisk: number;     // Price drop for 50% of suggested liquidation
+  priceDropFor90PercentRisk: number;     // Price drop for 90% of suggested liquidation
+  currentVolatility: number;             // Estimated price volatility
 }
 
 interface LoanPosition {
@@ -109,55 +113,60 @@ export function useRiskCalculator(position: Partial<LoanPosition>) {
 
     if (loanValue === 0) return null;
 
-    // Get asset configuration
-    const config = ASSET_CONFIGS[collateralSymbol as keyof typeof ASSET_CONFIGS];
-    if (!config) return null;
+    // Get asset suggestions (NOT enforced by FlexibleAssetHandler)
+    const suggestions = ASSET_SUGGESTIONS[collateralSymbol as keyof typeof ASSET_SUGGESTIONS];
+    if (!suggestions) return null;
 
     // Calculate collateralization ratio (6 decimals)
     const collateralizationRatio = Math.floor((collateralValue * 1000000) / loanValue);
     
-    // Calculate health factor
-    const healthFactor = Math.floor((collateralizationRatio * 1000000) / config.liquidationRatio);
+    // Calculate health factor based on SUGGESTED liquidation ratio
+    const healthFactor = Math.floor((collateralizationRatio * 1000000) / suggestions.suggestedLiquidationRatio);
     
-    // Determine risk level
-    const riskLevel = determineRiskLevel(collateralizationRatio);
+    // Determine risk level (ultra-flexible classification)
+    const riskLevel = determineFlexibleRiskLevel(collateralizationRatio);
     
-    // Calculate liquidation price
-    const liquidationPrice = (loanValue * config.liquidationRatio) / (collateralAmountNum * 1000000);
+    // Calculate theoretical liquidation price (based on suggestions)
+    const theoreticalLiquidationPrice = (loanValue * suggestions.suggestedLiquidationRatio) / (collateralAmountNum * 1000000);
     
-    // Calculate max withdrawable (in collateral units)
-    const minCollateralValue = (loanValue * config.collateralRatio) / 1000000;
-    const maxWithdrawable = collateralValue > minCollateralValue 
-      ? ((collateralValue - minCollateralValue) * collateralAmountNum) / collateralValue
-      : 0;
+    // FlexibleLoanManager allows withdrawing ANY amount (only prevents negative values)
+    // So max withdrawable is technically ALL collateral minus epsilon
+    const maxWithdrawableByMath = collateralAmountNum * 0.999; // Keep tiny amount for math safety
+    
+    // Max borrowable is limited ONLY by available liquidity (no ratio restrictions)
+    // Estimate available liquidity (in reality this would come from asset handler)
+    const estimatedAvailableLiquidity = parseFloat(suggestions.maxLoanAmount) * 0.8; // 80% utilization
+    const maxBorrowableByLiquidity = estimatedAvailableLiquidity;
 
-    // Calculate max borrowable (in USD)
-    const maxDebtValue = (collateralValue * 1000000) / config.collateralRatio;
-    const maxBorrowable = maxDebtValue > loanValue ? maxDebtValue - loanValue : 0;
+    // Calculate time to suggested liquidation (simplified)
+    const timeToSuggestedLiquidation = estimateTimeToSuggestedLiquidation(collateralizationRatio, interestRate, suggestions.suggestedLiquidationRatio);
 
-    // Calculate time to liquidation (simplified)
-    const timeToLiquidation = estimateTimeToLiquidation(collateralizationRatio, interestRate);
-
-    // Calculate price drop needed for liquidation
-    const priceDropToLiquidation = collateralPrice > liquidationPrice 
-      ? ((collateralPrice - liquidationPrice) / collateralPrice) * 100
+    // Calculate price drop needed for suggested liquidation
+    const priceDropToSuggestedLiquidation = collateralPrice > theoreticalLiquidationPrice 
+      ? ((collateralPrice - theoreticalLiquidationPrice) / collateralPrice) * 100
       : 0;
 
     // Get volatility
     const volatilityRisk = ASSET_VOLATILITY[collateralSymbol as keyof typeof ASSET_VOLATILITY] * 100;
 
+    // System flexibility note
+    const systemFlexibilityNote = collateralizationRatio < suggestions.suggestedLiquidationRatio 
+      ? "⚠️ VCOP's FlexibleLoanManager allows this ratio, but it's beyond suggested safety limits"
+      : "✅ Position follows suggested guidelines, but VCOP allows much more aggressive ratios";
+
     return {
       collateralizationRatio,
-      liquidationThreshold: config.liquidationRatio,
+      suggestedLiquidationThreshold: suggestions.suggestedLiquidationRatio,
       healthFactor,
-      maxWithdrawable,
-      maxBorrowable,
-      liquidationPrice,
+      maxWithdrawableByMath,
+      maxBorrowableByLiquidity,
+      theoreticalLiquidationPrice,
       riskLevel,
-      timeToLiquidation,
-      isLiquidatable: collateralizationRatio <= config.liquidationRatio,
-      priceDropToLiquidation,
-      volatilityRisk
+      timeToSuggestedLiquidation,
+      isTheoreticallyLiquidatable: collateralizationRatio <= suggestions.suggestedLiquidationRatio,
+      priceDropToSuggestedLiquidation,
+      volatilityRisk,
+      systemFlexibilityNote
     };
   }, [position.collateralAsset, position.loanAsset, position.collateralAmount, position.loanAmount, position.interestRate]);
 
@@ -168,13 +177,13 @@ export function useRiskCalculator(position: Partial<LoanPosition>) {
     if (!collateralSymbol) return null;
 
     const currentPrice = MOCK_PRICES[collateralSymbol as keyof typeof MOCK_PRICES];
-    const liquidationPrice = riskMetrics.liquidationPrice;
+    const suggestedLiquidationPrice = riskMetrics.theoreticalLiquidationPrice;
     const volatility = ASSET_VOLATILITY[collateralSymbol as keyof typeof ASSET_VOLATILITY];
 
     return {
-      priceDropFor10PercentLiquidation: calculatePriceDropForRisk(currentPrice, liquidationPrice, 10),
-      priceDropFor50PercentLiquidation: calculatePriceDropForRisk(currentPrice, liquidationPrice, 50),
-      priceDropFor90PercentLiquidation: calculatePriceDropForRisk(currentPrice, liquidationPrice, 90),
+      priceDropFor10PercentRisk: calculatePriceDropForRisk(currentPrice, suggestedLiquidationPrice, 10),
+      priceDropFor50PercentRisk: calculatePriceDropForRisk(currentPrice, suggestedLiquidationPrice, 50),
+      priceDropFor90PercentRisk: calculatePriceDropForRisk(currentPrice, suggestedLiquidationPrice, 90),
       currentVolatility: volatility * 100
     };
   }, [riskMetrics, position.collateralAsset]);
@@ -187,9 +196,12 @@ export function useRiskCalculator(position: Partial<LoanPosition>) {
     formatHealthFactor: (hf: number) => (hf / 1000000).toFixed(2),
     getRiskLevelColor,
     getRiskLevelBgColor,
-    isHealthy: (hf: number) => hf >= 2000000,
-    isAtRisk: (hf: number) => hf < 1500000,
-    isCritical: (hf: number) => hf < 1200000,
+    isUltraSafe: (ratio: number) => ratio >= ULTRA_SAFE_RATIO,
+    isHealthy: (ratio: number) => ratio >= HEALTHY_RATIO,
+    isModerate: (ratio: number) => ratio >= MODERATE_RATIO,
+    isAggressive: (ratio: number) => ratio >= AGGRESSIVE_RATIO,
+    isExtreme: (ratio: number) => ratio >= EXTREME_RATIO,
+    isDangerZone: (ratio: number) => ratio < EXTREME_RATIO,
   };
 }
 
@@ -207,28 +219,29 @@ function getAssetSymbol(address: string): string | null {
   return addressToSymbol[address] || address;
 }
 
-function determineRiskLevel(collateralizationRatio: number): RiskLevel {
+function determineFlexibleRiskLevel(collateralizationRatio: number): RiskLevel {
+  if (collateralizationRatio >= ULTRA_SAFE_RATIO) return RiskLevel.ULTRA_SAFE;
   if (collateralizationRatio >= HEALTHY_RATIO) return RiskLevel.HEALTHY;
-  if (collateralizationRatio >= WARNING_RATIO) return RiskLevel.WARNING;
-  if (collateralizationRatio >= DANGER_RATIO) return RiskLevel.DANGER;
-  if (collateralizationRatio >= CRITICAL_RATIO) return RiskLevel.CRITICAL;
-  return RiskLevel.LIQUIDATABLE;
+  if (collateralizationRatio >= MODERATE_RATIO) return RiskLevel.MODERATE;
+  if (collateralizationRatio >= AGGRESSIVE_RATIO) return RiskLevel.AGGRESSIVE;
+  if (collateralizationRatio >= EXTREME_RATIO) return RiskLevel.EXTREME;
+  return RiskLevel.DANGER_ZONE;
 }
 
-function estimateTimeToLiquidation(collateralizationRatio: number, interestRate: number): number {
-  if (collateralizationRatio <= CRITICAL_RATIO) return 0;
+function estimateTimeToSuggestedLiquidation(collateralizationRatio: number, interestRate: number, suggestedLiquidationRatio: number): number {
+  if (collateralizationRatio <= suggestedLiquidationRatio) return 0;
   
   // Simplified calculation: estimate based on interest accrual rate
-  const timeToReachCritical = ((collateralizationRatio - CRITICAL_RATIO) * 365 * 24) / 
-                             (interestRate * CRITICAL_RATIO / 1000000);
+  const timeToReachSuggestedLiquidation = ((collateralizationRatio - suggestedLiquidationRatio) * 365 * 24) / 
+                                         (interestRate * suggestedLiquidationRatio / 1000000);
   
-  return Math.max(0, timeToReachCritical);
+  return Math.max(0, timeToReachSuggestedLiquidation);
 }
 
-function calculatePriceDropForRisk(currentPrice: number, liquidationPrice: number, riskPercentage: number): number {
-  if (liquidationPrice >= currentPrice) return 0;
+function calculatePriceDropForRisk(currentPrice: number, suggestedLiquidationPrice: number, riskPercentage: number): number {
+  if (suggestedLiquidationPrice >= currentPrice) return 0;
   
-  const maxDrop = currentPrice - liquidationPrice;
+  const maxDrop = currentPrice - suggestedLiquidationPrice;
   const dropPercentage = (maxDrop / currentPrice) * 100;
   
   return (dropPercentage * riskPercentage) / 100;
@@ -236,22 +249,24 @@ function calculatePriceDropForRisk(currentPrice: number, liquidationPrice: numbe
 
 export function getRiskLevelColor(riskLevel: RiskLevel): string {
   switch (riskLevel) {
+    case RiskLevel.ULTRA_SAFE: return 'text-green-800';
     case RiskLevel.HEALTHY: return 'text-green-600';
-    case RiskLevel.WARNING: return 'text-yellow-600';
-    case RiskLevel.DANGER: return 'text-orange-600';
-    case RiskLevel.CRITICAL: return 'text-red-600';
-    case RiskLevel.LIQUIDATABLE: return 'text-red-800';
+    case RiskLevel.MODERATE: return 'text-blue-600';
+    case RiskLevel.AGGRESSIVE: return 'text-yellow-600';
+    case RiskLevel.EXTREME: return 'text-orange-600';
+    case RiskLevel.DANGER_ZONE: return 'text-red-600';
     default: return 'text-gray-600';
   }
 }
 
 export function getRiskLevelBgColor(riskLevel: RiskLevel): string {
   switch (riskLevel) {
+    case RiskLevel.ULTRA_SAFE: return 'bg-green-200';
     case RiskLevel.HEALTHY: return 'bg-green-100';
-    case RiskLevel.WARNING: return 'bg-yellow-100';
-    case RiskLevel.DANGER: return 'bg-orange-100';
-    case RiskLevel.CRITICAL: return 'bg-red-100';
-    case RiskLevel.LIQUIDATABLE: return 'bg-red-200';
+    case RiskLevel.MODERATE: return 'bg-blue-100';
+    case RiskLevel.AGGRESSIVE: return 'bg-yellow-100';
+    case RiskLevel.EXTREME: return 'bg-orange-100';
+    case RiskLevel.DANGER_ZONE: return 'bg-red-100';
     default: return 'bg-gray-100';
   }
 }

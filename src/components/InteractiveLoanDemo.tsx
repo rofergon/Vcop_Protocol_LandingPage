@@ -30,26 +30,35 @@ const DEMO_SCENARIOS = [
     interestRate: "6"
   },
   {
-    name: "Moderate Risk",
-    description: "75% LTV for higher leverage",
+    name: "Aggressive Leverage",
+    description: "85% LTV - Higher risk, higher reward",
     collateralAsset: "ETH",
     loanAsset: "USDC",
     collateralAmount: "1",
-    loanAmount: "1875",
+    loanAmount: "2125",
     interestRate: "8"
   },
   {
-    name: "High Leverage",
-    description: "90% LTV - Expert only",
+    name: "Extreme Leverage",
+    description: "95% LTV - VCOP allows extreme ratios!",
     collateralAsset: "ETH",
     loanAsset: "USDC",
     collateralAmount: "1",
-    loanAmount: "2250",
+    loanAmount: "2375",
     interestRate: "12"
   },
   {
-    name: "VCOP Hedge",
-    description: "Borrow pesos with crypto",
+    name: "Beyond 100% LTV",
+    description: "105% LTV - Only possible with VCOP!",
+    collateralAsset: "ETH",
+    loanAsset: "USDC",
+    collateralAmount: "1",
+    loanAmount: "2625",
+    interestRate: "15"
+  },
+  {
+    name: "VCOP Peso Hedge",
+    description: "Borrow pesos with crypto - any ratio",
     collateralAsset: "ETH",
     loanAsset: "VCOP",
     collateralAmount: "1",
@@ -82,11 +91,12 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
 
   const getRiskIcon = (riskLevel: RiskLevel) => {
     switch (riskLevel) {
+      case RiskLevel.ULTRA_SAFE: return <Shield className="w-5 h-5" />;
       case RiskLevel.HEALTHY: return <Shield className="w-5 h-5" />;
-      case RiskLevel.WARNING: return <Activity className="w-5 h-5" />;
-      case RiskLevel.DANGER: return <AlertTriangle className="w-5 h-5" />;
-      case RiskLevel.CRITICAL: return <TrendingDown className="w-5 h-5" />;
-      case RiskLevel.LIQUIDATABLE: return <AlertTriangle className="w-5 h-5" />;
+      case RiskLevel.MODERATE: return <Activity className="w-5 h-5" />;
+      case RiskLevel.AGGRESSIVE: return <Target className="w-5 h-5" />;
+      case RiskLevel.EXTREME: return <AlertTriangle className="w-5 h-5" />;
+      case RiskLevel.DANGER_ZONE: return <TrendingDown className="w-5 h-5" />;
       default: return <Calculator className="w-5 h-5" />;
     }
   };
@@ -97,8 +107,8 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
       <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-2xl font-bold mb-2">Live Risk Calculator</h3>
-            <p className="text-emerald-100">Experience VCOP's real-time risk analysis</p>
+            <h3 className="text-2xl font-bold mb-2">VCOP Flexible Risk Calculator</h3>
+            <p className="text-emerald-100">Experience ultra-flexible lending - ANY ratio allowed!</p>
           </div>
           <div className="bg-white/20 p-3 rounded-lg">
             <Calculator className="w-8 h-8" />
@@ -231,44 +241,52 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <div className="text-sm text-gray-600">Liquidation Price</div>
                     <div className="text-xl font-bold text-gray-900">
-                      ${riskMetrics.liquidationPrice.toFixed(2)}
+                      ${riskMetrics.theoreticalLiquidationPrice.toFixed(2)}
                     </div>
+                    <div className="text-xs text-gray-500 mt-1">Suggested threshold</div>
                   </div>
                   
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <div className="text-sm text-gray-600">Price Drop to Liq.</div>
                     <div className="text-xl font-bold text-red-600">
-                      -{riskMetrics.priceDropToLiquidation.toFixed(1)}%
+                      -{riskMetrics.priceDropToSuggestedLiquidation.toFixed(1)}%
                     </div>
+                    <div className="text-xs text-gray-500 mt-1">To suggested threshold</div>
                   </div>
                 </div>
 
                 {/* Advanced Metrics */}
                 <div className="mt-4 space-y-3">
                   <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                    <span className="text-sm font-medium text-blue-800">Max Additional Borrowable</span>
-                    <span className="font-bold text-blue-900">${riskMetrics.maxBorrowable.toFixed(2)}</span>
+                    <span className="text-sm font-medium text-blue-800">Max Borrowable (Liquidity)</span>
+                    <span className="font-bold text-blue-900">${riskMetrics.maxBorrowableByLiquidity.toFixed(2)}</span>
                   </div>
                   
                   <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                    <span className="text-sm font-medium text-green-800">Max Withdrawable</span>
-                    <span className="font-bold text-green-900">{riskMetrics.maxWithdrawable.toFixed(4)} {customPosition.collateralAsset}</span>
+                    <span className="text-sm font-medium text-green-800">Max Withdrawable (Math)</span>
+                    <span className="font-bold text-green-900">{riskMetrics.maxWithdrawableByMath.toFixed(4)} {customPosition.collateralAsset}</span>
                   </div>
                   
-                  {riskMetrics.timeToLiquidation > 0 && (
+                  {riskMetrics.timeToSuggestedLiquidation > 0 && (
                     <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
                       <span className="text-sm font-medium text-yellow-800 flex items-center">
                         <Clock className="w-4 h-4 mr-1" />
-                        Est. Time to Liquidation
+                        Time to Suggested Liq.
                       </span>
                       <span className="font-bold text-yellow-900">
-                        {riskMetrics.timeToLiquidation > 24 
-                          ? `${Math.floor(riskMetrics.timeToLiquidation / 24)}d` 
-                          : `${Math.floor(riskMetrics.timeToLiquidation)}h`
+                        {riskMetrics.timeToSuggestedLiquidation > 24 
+                          ? `${Math.floor(riskMetrics.timeToSuggestedLiquidation / 24)}d` 
+                          : `${Math.floor(riskMetrics.timeToSuggestedLiquidation)}h`
                         }
                       </span>
                     </div>
                   )}
+                  
+                  {/* System Flexibility Warning */}
+                  <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                    <div className="text-xs text-purple-800 font-medium mb-1">VCOP Flexibility:</div>
+                    <div className="text-xs text-purple-700">{riskMetrics.systemFlexibilityNote}</div>
+                  </div>
                 </div>
 
                 {/* Price Impact Analysis */}
@@ -280,16 +298,16 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
                     </h5>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span>10% Liquidation Risk:</span>
-                        <span className="font-medium">-{priceImpact.priceDropFor10PercentLiquidation.toFixed(1)}%</span>
+                        <span>10% Risk Scenario:</span>
+                        <span className="font-medium">-{priceImpact.priceDropFor10PercentRisk.toFixed(1)}%</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>50% Liquidation Risk:</span>
-                        <span className="font-medium">-{priceImpact.priceDropFor50PercentLiquidation.toFixed(1)}%</span>
+                        <span>50% Risk Scenario:</span>
+                        <span className="font-medium">-{priceImpact.priceDropFor50PercentRisk.toFixed(1)}%</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>90% Liquidation Risk:</span>
-                        <span className="font-medium">-{priceImpact.priceDropFor90PercentLiquidation.toFixed(1)}%</span>
+                        <span>90% Risk Scenario:</span>
+                        <span className="font-medium">-{priceImpact.priceDropFor90PercentRisk.toFixed(1)}%</span>
                       </div>
                       <div className="flex justify-between border-t pt-2">
                         <span>Asset Volatility:</span>
