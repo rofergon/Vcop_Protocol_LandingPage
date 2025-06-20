@@ -20,7 +20,8 @@ import {
   Sliders,
   TrendingUp as TrendingUpIcon,
   Percent,
-  ArrowUpDown
+  ArrowUpDown,
+  ChevronDown
 } from 'lucide-react';
 import { useRiskCalculator, RiskLevel } from '../hooks/useRiskCalculator';
 
@@ -85,6 +86,90 @@ const EASY_PRESETS = [
   { name: "VCOP Ultra", ltv: 105, description: "Beyond limits!", color: "red" }
 ];
 
+// Asset icon component
+const AssetIcon: React.FC<{ asset: string; className?: string }> = ({ asset, className = "w-5 h-5" }) => {
+  switch (asset.toLowerCase()) {
+    case 'eth':
+      return <img src="/ethereum-eth-logo.svg" alt="ETH" className={`${className} inline-block align-middle`} />;
+    case 'wbtc':
+    case 'btc':
+      return <img src="/bitcoin-btc-logo.svg" alt="BTC" className={`${className} inline-block align-middle`} />;
+    case 'vcop':
+      return (
+        <div className={`${className} inline-block align-middle bg-gradient-to-br from-emerald-500 to-teal-500 rounded-full p-0.5 flex items-center justify-center`}>
+          <img src="/logovcop.png" alt="VCOP" className="w-full h-full object-contain rounded-full" />
+        </div>
+      );
+    case 'usdc':
+      return <img src="/usd-coin-usdc-logo.svg" alt="USDC" className={`${className} inline-block align-middle`} />;
+    default:
+      return <DollarSign className={`${className} inline-block align-middle`} />;
+  }
+};
+
+// Custom dropdown component
+const AssetDropdown: React.FC<{
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+  className?: string;
+  borderColor?: string;
+}> = ({ value, onChange, options, className = "", borderColor = "border-gray-300" }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const selectedOption = options.find(opt => opt.value === value);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.asset-dropdown')) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
+  
+  return (
+    <div className={`relative asset-dropdown ${className}`}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full p-2 text-sm border ${borderColor} rounded-lg bg-white text-left flex items-center justify-between hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+      >
+        <span className="flex items-center gap-2">
+          <AssetIcon asset={value} className="w-4 h-4" />
+          {selectedOption?.label}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+              className="w-full p-2 text-left flex items-center gap-2 hover:bg-blue-50 first:rounded-t-lg last:rounded-b-lg transition-colors"
+            >
+              <AssetIcon asset={option.value} className="w-4 h-4" />
+              <span className="text-sm">{option.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ className = "" }) => {
   const [selectedScenario, setSelectedScenario] = useState(0);
   const [customPosition, setCustomPosition] = useState(DEMO_SCENARIOS[0]);
@@ -100,12 +185,12 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
 
   const { riskMetrics, priceImpact, formatCollateralizationRatio, formatHealthFactor, getRiskLevelColor, getRiskLevelBgColor } = useRiskCalculator(customPosition);
 
-  // Asset prices for calculations
+  // Asset prices for calculations (all in USD)
   const assetPrices = {
     ETH: 2500,
     WBTC: 45000,
     USDC: 1,
-    VCOP: 1
+    VCOP: 1/4100  // 1 VCOP = 1 COP = ~1/4100 USD
   };
 
   // Calculate loan amount from LTV in easy mode
@@ -283,19 +368,21 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
               <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
                 <h5 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
                   <Shield className="w-4 h-4" />
-                  💰 Collateral
+                  <AssetIcon asset={easyCollateralAsset} className="w-4 h-4" />
+                  Collateral
                 </h5>
                 
                 <div className="space-y-3">
-                  <select
+                  <AssetDropdown
                     value={easyCollateralAsset}
-                    onChange={(e) => setEasyCollateralAsset(e.target.value)}
-                    className="w-full p-2 text-sm border border-blue-300 rounded-lg bg-white"
-                  >
-                    <option value="ETH">🔷 ETH</option>
-                    <option value="WBTC">₿ WBTC</option>
-                    <option value="USDC">💵 USDC</option>
-                  </select>
+                    onChange={setEasyCollateralAsset}
+                    options={[
+                      { value: "ETH", label: "ETH" },
+                      { value: "WBTC", label: "WBTC" },
+                      { value: "USDC", label: "USDC" }
+                    ]}
+                    borderColor="border-blue-300"
+                  />
                   
                   <div className="relative">
                     <input
@@ -306,8 +393,9 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
                       className="w-full p-2 text-sm border border-blue-300 rounded-lg"
                       placeholder="0.0"
                     />
-                    <div className="absolute right-2 top-2 text-blue-600 font-medium text-xs">
-                      {easyCollateralAsset}
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+                      <AssetIcon asset={easyCollateralAsset} className="w-4 h-4" />
+                      <span className="text-blue-600 font-medium text-xs">{easyCollateralAsset}</span>
                     </div>
                   </div>
                   
@@ -323,22 +411,25 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
               <div className="bg-emerald-50 rounded-lg p-3.5 border border-emerald-200">
                 <h5 className="font-semibold text-emerald-900 mb-2 flex items-center gap-2">
                   <DollarSign className="w-4 h-4" />
-                  📈 Loan
+                  <AssetIcon asset={easyLoanAsset} className="w-4 h-4" />
+                  Loan
                 </h5>
                 
                 <div className="space-y-2">
-                  <select
+                  <AssetDropdown
                     value={easyLoanAsset}
-                    onChange={(e) => setEasyLoanAsset(e.target.value)}
-                    className="w-full p-2 text-sm border border-emerald-300 rounded-lg bg-white"
-                  >
-                    <option value="USDC">💵 USDC</option>
-                    <option value="VCOP">🇨🇴 VCOP</option>
-                    <option value="ETH">🔷 ETH</option>
-                  </select>
+                    onChange={setEasyLoanAsset}
+                    options={[
+                      { value: "USDC", label: "USDC" },
+                      { value: "VCOP", label: "VCOP" },
+                      { value: "ETH", label: "ETH" }
+                    ]}
+                    borderColor="border-emerald-300"
+                  />
                   
                   <div className="bg-emerald-100 p-2 rounded-lg text-center">
-                    <div className="text-sm font-bold text-emerald-900">
+                    <div className="text-sm font-bold text-emerald-900 flex items-center justify-center gap-1">
+                      <AssetIcon asset={easyLoanAsset} className="w-4 h-4" />
                       {parseFloat(customPosition.loanAmount).toLocaleString()} {easyLoanAsset}
                     </div>
                     <div className="text-xs text-emerald-700">
@@ -426,28 +517,38 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Collateral Asset</label>
-                    <select
-                      value={customPosition.collateralAsset}
-                      onChange={(e) => handleInputChange('collateralAsset', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    >
-                      <option value="ETH">ETH</option>
-                      <option value="WBTC">WBTC</option>
-                      <option value="USDC">USDC</option>
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={customPosition.collateralAsset}
+                        onChange={(e) => handleInputChange('collateralAsset', e.target.value)}
+                        className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 appearance-none"
+                      >
+                        <option value="ETH">ETH</option>
+                        <option value="WBTC">WBTC</option>
+                        <option value="USDC">USDC</option>
+                      </select>
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <AssetIcon asset={customPosition.collateralAsset} className="w-5 h-5" />
+                      </div>
+                    </div>
                   </div>
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Loan Asset</label>
-                    <select
-                      value={customPosition.loanAsset}
-                      onChange={(e) => handleInputChange('loanAsset', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    >
-                      <option value="USDC">USDC</option>
-                      <option value="VCOP">VCOP</option>
-                      <option value="ETH">ETH</option>
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={customPosition.loanAsset}
+                        onChange={(e) => handleInputChange('loanAsset', e.target.value)}
+                        className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 appearance-none"
+                      >
+                        <option value="USDC">USDC</option>
+                        <option value="VCOP">VCOP</option>
+                        <option value="ETH">ETH</option>
+                      </select>
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <AssetIcon asset={customPosition.loanAsset} className="w-5 h-5" />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -558,7 +659,11 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
                       
                       <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
                         <span className="text-sm font-medium text-green-800">Max Withdrawable (Math)</span>
-                        <span className="font-bold text-green-900">{riskMetrics.maxWithdrawableByMath.toFixed(4)} {customPosition.collateralAsset}</span>
+                        <span className="font-bold text-green-900 flex items-center gap-1">
+                          {riskMetrics.maxWithdrawableByMath.toFixed(4)} 
+                          <AssetIcon asset={customPosition.collateralAsset} className="w-4 h-4" />
+                          {customPosition.collateralAsset}
+                        </span>
                       </div>
                       
                       {riskMetrics.timeToSuggestedLiquidation > 0 && (
