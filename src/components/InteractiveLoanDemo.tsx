@@ -176,10 +176,14 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
     <div className={`bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden ${className}`}>
       {/* Header */}
       <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-4 text-white">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-2">
           <div>
             <h3 className="text-lg font-bold mb-1">VCOP Flexible Risk Calculator</h3>
             <p className="text-emerald-100 text-sm">ANY ratio allowed! 🚀</p>
+            <div className="flex items-center gap-2 text-xs text-emerald-100 mt-1">
+              <Calculator className="w-3 h-3" />
+              <span>Real-time risk analysis</span>
+            </div>
           </div>
           <div className="bg-white/20 p-2 rounded-lg">
             <Calculator className="w-6 h-6" />
@@ -187,7 +191,7 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
         </div>
 
         {/* Mode Toggle */}
-        <div className="mt-4 flex items-center justify-center">
+        <div className="flex items-center justify-center">
           <div className="bg-white/20 rounded-full p-1 flex">
             <button
               onClick={() => setIsEasyMode(true)}
