@@ -179,7 +179,7 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold mb-1">VCOP Flexible Risk Calculator</h3>
-            <p className="text-emerald-100 text-sm">Experience ultra-flexible lending - ANY ratio allowed!</p>
+            <p className="text-emerald-100 text-sm">ANY ratio allowed! 🚀</p>
           </div>
           <div className="bg-white/20 p-2 rounded-lg">
             <Calculator className="w-6 h-6" />
@@ -223,7 +223,7 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
             <div>
               <h4 className="text-base font-semibold text-gray-900 mb-2 flex items-center gap-2">
                 <Target className="w-4 h-4 text-emerald-600" />
-                Choose Your Risk Level
+                Risk Level
               </h4>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                 {EASY_PRESETS.map((preset, index) => (
@@ -236,26 +236,24 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
                         : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    <div className="font-semibold text-xs">{preset.name}</div>
-                    <div className="text-lg font-bold my-1">{preset.ltv}%</div>
-                    <div className="text-xs text-gray-600">{preset.description}</div>
+                    <div className="text-lg font-bold">{preset.ltv}%</div>
+                    <div className="text-xs text-gray-600">{preset.name}</div>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Visual LTV Slider */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
                 <h5 className="font-semibold text-gray-900 flex items-center gap-2">
                   <Sliders className="w-4 h-4 text-blue-600" />
-                  Loan-to-Value Ratio
+                  LTV {easyLTV}%
                 </h5>
-                <div className="text-xl font-bold text-gray-900">{easyLTV}%</div>
               </div>
               
               {/* LTV Slider */}
-              <div className="relative mb-3">
+              <div className="relative mb-2">
                 <input
                   type="range"
                   min="10"
@@ -267,66 +265,49 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
                     background: `linear-gradient(to right, #10b981 0%, #3b82f6 60%, #f59e0b 75%, #ef4444 90%, #dc2626 100%)`
                   }}
                 />
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>Safe</span>
-                  <span>Traditional Limit</span>
-                  <span>VCOP Ultra</span>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>🟢</span>
+                  <span>⚠️ 80%</span>
+                  <span>🚀</span>
                 </div>
-              </div>
-
-              {/* LTV Visual Bar */}
-              <div className="relative h-4 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-500 ${getLTVColor(easyLTV)}`}
-                  style={{ width: `${Math.min(easyLTV, 120) / 120 * 100}%` }}
-                />
-                {/* Traditional DeFi limit marker */}
-                <div className="absolute top-0 left-2/3 w-0.5 h-full bg-gray-600 opacity-50" />
               </div>
             </div>
 
             {/* Assets and Amount */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Collateral Section */}
-              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                <h5 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+              <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                <h5 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
                   <Shield className="w-4 h-4" />
-                  Your Collateral
+                  💰 Collateral
                 </h5>
                 
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-blue-800 mb-1">Asset</label>
-                    <select
-                      value={easyCollateralAsset}
-                      onChange={(e) => setEasyCollateralAsset(e.target.value)}
-                      className="w-full p-2 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                    >
-                      <option value="ETH">ETH - Ethereum</option>
-                      <option value="WBTC">WBTC - Bitcoin</option>
-                      <option value="USDC">USDC - USD Coin</option>
-                    </select>
-                  </div>
+                <div className="space-y-2">
+                  <select
+                    value={easyCollateralAsset}
+                    onChange={(e) => setEasyCollateralAsset(e.target.value)}
+                    className="w-full p-2 text-sm border border-blue-300 rounded-lg bg-white"
+                  >
+                    <option value="ETH">🔷 ETH</option>
+                    <option value="WBTC">₿ WBTC</option>
+                    <option value="USDC">💵 USDC</option>
+                  </select>
                   
-                  <div>
-                    <label className="block text-xs font-medium text-blue-800 mb-1">Amount</label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={easyCollateralAmount}
-                        onChange={(e) => setEasyCollateralAmount(parseFloat(e.target.value) || 0)}
-                        className="w-full p-2 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="0.0"
-                      />
-                      <div className="absolute right-2 top-2 text-blue-600 font-medium text-xs">
-                        {easyCollateralAsset}
-                      </div>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={easyCollateralAmount}
+                      onChange={(e) => setEasyCollateralAmount(parseFloat(e.target.value) || 0)}
+                      className="w-full p-2 text-sm border border-blue-300 rounded-lg"
+                      placeholder="0.0"
+                    />
+                    <div className="absolute right-2 top-2 text-blue-600 font-medium text-xs">
+                      {easyCollateralAsset}
                     </div>
                   </div>
                   
-                  <div className="bg-blue-100 p-2 rounded-lg">
-                    <div className="text-xs text-blue-800">Value</div>
+                  <div className="bg-blue-100 p-2 rounded-lg text-center">
                     <div className="text-sm font-bold text-blue-900">
                       ${(easyCollateralAmount * assetPrices[easyCollateralAsset as keyof typeof assetPrices]).toLocaleString()}
                     </div>
@@ -335,46 +316,35 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
               </div>
 
               {/* Loan Section */}
-              <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
-                <h5 className="font-semibold text-emerald-900 mb-3 flex items-center gap-2">
+              <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-200">
+                <h5 className="font-semibold text-emerald-900 mb-2 flex items-center gap-2">
                   <DollarSign className="w-4 h-4" />
-                  Your Loan
+                  📈 Loan
                 </h5>
                 
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-emerald-800 mb-1">Asset</label>
-                    <select
-                      value={easyLoanAsset}
-                      onChange={(e) => setEasyLoanAsset(e.target.value)}
-                      className="w-full p-2 text-sm border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
-                    >
-                      <option value="USDC">USDC - USD Coin</option>
-                      <option value="VCOP">VCOP - Virtual Colombian Peso</option>
-                      <option value="ETH">ETH - Ethereum</option>
-                    </select>
-                  </div>
+                <div className="space-y-2">
+                  <select
+                    value={easyLoanAsset}
+                    onChange={(e) => setEasyLoanAsset(e.target.value)}
+                    className="w-full p-2 text-sm border border-emerald-300 rounded-lg bg-white"
+                  >
+                    <option value="USDC">💵 USDC</option>
+                    <option value="VCOP">🇨🇴 VCOP</option>
+                    <option value="ETH">🔷 ETH</option>
+                  </select>
                   
-                  <div className="bg-emerald-100 p-2 rounded-lg">
-                    <div className="text-xs text-emerald-800">Automatic Amount</div>
+                  <div className="bg-emerald-100 p-2 rounded-lg text-center">
                     <div className="text-sm font-bold text-emerald-900">
                       {parseFloat(customPosition.loanAmount).toLocaleString()} {easyLoanAsset}
                     </div>
-                    <div className="text-xs text-emerald-700 mt-1">
-                      ${(parseFloat(customPosition.loanAmount) * assetPrices[easyLoanAsset as keyof typeof assetPrices]).toLocaleString()} value
+                    <div className="text-xs text-emerald-700">
+                      ${(parseFloat(customPosition.loanAmount) * assetPrices[easyLoanAsset as keyof typeof assetPrices]).toLocaleString()}
                     </div>
                   </div>
                   
-                  <div className="bg-yellow-50 p-2 rounded-lg border border-yellow-200">
-                    <div className="text-xs text-yellow-800 flex items-center gap-1">
-                      <Info className="w-3 h-3" />
-                      Interest Rate
-                    </div>
+                  <div className="bg-yellow-50 p-2 rounded-lg text-center">
                     <div className="text-sm font-bold text-yellow-900">
                       {customPosition.interestRate}% APR
-                    </div>
-                    <div className="text-xs text-yellow-700 mt-1">
-                      Auto-adjusted based on risk
                     </div>
                   </div>
                 </div>
@@ -386,36 +356,30 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
               <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 border border-purple-200">
                 <h5 className="font-semibold text-purple-900 mb-2 flex items-center gap-2">
                   <BarChart3 className="w-4 h-4" />
-                  Live Risk Analysis
+                  📊 Live Risk
                 </h5>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="text-center">
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="text-center bg-white p-2 rounded-lg">
                     <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${getRiskLevelBgColor(riskMetrics.riskLevel)} ${getRiskLevelColor(riskMetrics.riskLevel)}`}>
                       {getRiskIcon(riskMetrics.riskLevel)}
-                      <span className="ml-1">{riskMetrics.riskLevel.replace('_', ' ')}</span>
                     </div>
-                    <div className="text-xs text-gray-600 mt-1">Risk Level</div>
+                    <div className="text-xs text-gray-600 mt-1">Risk</div>
                   </div>
                   
-                  <div className="text-center">
-                    <div className="text-lg font-bold text-gray-900">
+                  <div className="text-center bg-white p-2 rounded-lg">
+                    <div className="text-sm font-bold text-gray-900">
                       {formatHealthFactor(riskMetrics.healthFactor)}
                     </div>
-                    <div className="text-xs text-gray-600">Health Factor</div>
+                    <div className="text-xs text-gray-600">Health</div>
                   </div>
                   
-                  <div className="text-center">
-                    <div className="text-lg font-bold text-gray-900">
+                  <div className="text-center bg-white p-2 rounded-lg">
+                    <div className="text-sm font-bold text-gray-900">
                       {currentLTV.toFixed(1)}%
                     </div>
-                    <div className="text-xs text-gray-600">Current LTV</div>
+                    <div className="text-xs text-gray-600">LTV</div>
                   </div>
-                </div>
-                
-                <div className="mt-3 p-2 bg-white rounded-lg border">
-                  <div className="text-xs text-gray-600 mb-1">VCOP Flexibility Note:</div>
-                  <div className="text-xs text-gray-800">{riskMetrics.systemFlexibilityNote}</div>
                 </div>
               </div>
             )}
