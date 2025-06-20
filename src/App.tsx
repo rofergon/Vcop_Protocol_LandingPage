@@ -194,6 +194,51 @@ function App() {
 
   return (
     <div className="min-h-screen bg-white" style={{ zoom: '0.9' }}>
+      {/* Navigation Bar */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/10 backdrop-blur-lg border-b border-white/20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-3">
+              <img 
+                src="/logovcop.png" 
+                alt="VCOP Protocol" 
+                className="w-10 h-10 hover:animate-spin transition-all duration-300"
+              />
+              <span className="text-white font-bold text-xl">VCOP Protocol</span>
+            </div>
+            
+            {/* Live Status Badge */}
+            <div className="hidden lg:block">
+              <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <Globe className="w-3 h-3 mr-1.5" />
+                Live on Base Sepolia • Mainnet Q1 2025
+              </span>
+            </div>
+            
+            <div className="hidden md:flex items-center space-x-8">
+              <a href="#" className="text-white/80 hover:text-white transition-colors">Protocol</a>
+              <a 
+                href="https://saritus-organization.gitbook.io/docs-vcop-protocol" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-white/80 hover:text-white transition-colors"
+              >
+                Documentation
+              </a>
+              <a href="#" className="text-white/80 hover:text-white transition-colors">FAQ</a>
+              <a 
+                href="https://vcop-lime.vercel.app/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Launch App
+              </a>
+            </div>
+          </div>
+        </div>
+      </nav>
+
       {/* Enhanced Hero Section */}
       <section className="relative min-h-screen flex flex-col overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-green-800 to-teal-900"></div>
@@ -212,13 +257,13 @@ function App() {
           <div className="w-full max-w-7xl mx-auto text-center">
             <div className={`transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
               
-              {/* Badge - Responsive */}
-              <div className="mb-4 md:mb-6">
-                <span className="inline-flex items-center px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  <Globe className="w-3 h-3 md:w-4 md:h-4 mr-1.5 md:mr-2" />
-                  <span className="hidden sm:inline">Live on Base Sepolia • Mainnet Q1 2025</span>
-                  <span className="sm:hidden">Live on Base • Q1 2025</span>
-                </span>
+              {/* Logo prominente */}
+              <div className="mb-6 md:mb-8">
+                <img 
+                  src="/logovcop.png" 
+                  alt="VCOP Protocol" 
+                  className="w-20 h-20 md:w-32 md:h-32 mx-auto mb-4 animate-pulse hover:animate-spin transition-all duration-700"
+                />
               </div>
               
               {/* Main Title - Mobile First Responsive */}
@@ -741,9 +786,11 @@ function App() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             <div className="md:col-span-2">
               <h3 className="text-2xl font-bold mb-4 flex items-center">
-                <div className="w-8 h-8 bg-emerald-500 rounded-lg mr-3 flex items-center justify-center">
-                  <DollarSign className="w-5 h-5" />
-                </div>
+                <img 
+                  src="/logovcop.png" 
+                  alt="VCOP Protocol Logo" 
+                  className="w-8 h-8 mr-3"
+                />
                 VCOP Protocol
               </h3>
               <p className="text-gray-400 max-w-md mb-6 leading-relaxed">
