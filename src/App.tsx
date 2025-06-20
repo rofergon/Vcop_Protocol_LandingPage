@@ -16,7 +16,6 @@ import {
   AlertTriangle,
   TrendingUp,
   Clock,
-  Star,
   ArrowUpRight,
   Play,
   Pause,
@@ -42,7 +41,6 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(true);
   const [selectedFeature, setSelectedFeature] = useState(0);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [hoveredComparison, setHoveredComparison] = useState<number | null>(null);
 
   const stats = [
     { value: "2,600", label: "COP per USD (2014)", color: "text-green-400" },
@@ -113,30 +111,6 @@ function App() {
     }
   ];
 
-  const testimonials = [
-    {
-      name: "Carlos Mendoza",
-      role: "Crypto Trader, Bogotá",
-      avatar: "https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150",
-      quote: "VCOP saved my portfolio during the last peso crash. I kept my ETH exposure while spending in pesos.",
-      rating: 5
-    },
-    {
-      name: "María González",
-      role: "DeFi Investor, Medellín",
-      avatar: "https://images.pexels.com/photos/3763188/pexels-photo-3763188.jpeg?auto=compress&cs=tinysrgb&w=150",
-      quote: "Finally, a protocol that understands Latin American financial reality. The flexibility is unmatched.",
-      rating: 5
-    },
-    {
-      name: "Diego Ramírez",
-      role: "Financial Advisor, Cali",
-      avatar: "https://images.pexels.com/photos/2182970/pexels-photo-2182970.jpeg?auto=compress&cs=tinysrgb&w=150",
-      quote: "I recommend VCOP to all my clients. It's the smartest hedge against peso devaluation.",
-      rating: 5
-    }
-  ];
-
   const competitors = [
     {
       name: "Traditional Banks",
@@ -170,24 +144,24 @@ function App() {
 
   const faqs = [
     {
-      question: "¿Cómo mantiene VCOP la paridad 1:1 con el peso colombiano?",
-      answer: "VCOP utiliza un sistema triple: oráculos múltiples para precios en tiempo real, un Módulo de Estabilidad de Paridad (PSM) para intercambios instantáneos VCOP↔USDC, y un hook de Uniswap v4 que rebalancea automáticamente la liquidez cuando detecta desviaciones mayores al 1%."
+      question: "How does VCOP maintain 1:1 parity with the Colombian peso?",
+      answer: "VCOP uses a triple system: multiple oracles for real-time pricing, a Parity Stability Module (PSM) for instant VCOP↔USDC swaps, and a Uniswap v4 hook that automatically rebalances liquidity when it detects deviations greater than 1%."
     },
     {
-      question: "¿Qué tan seguro es prestar hasta 99.9% LTV?",
-      answer: "El sistema FlexibleLoanManager permite ratios extremos pero con monitoreo en tiempo real. Nuestro Calculador de Riesgo rastrea 15+ métricas cada bloque y proporciona alertas tempranas. Los usuarios avanzados pueden asumir más riesgo, mientras que los conservadores pueden limitarse a ratios más seguros."
+      question: "How safe is borrowing up to 99.9% LTV?",
+      answer: "The FlexibleLoanManager system allows extreme ratios but with real-time monitoring. Our Risk Calculator tracks 15+ metrics every block and provides early warnings. Advanced users can take more risk, while conservative users can limit themselves to safer ratios."
     },
     {
-      question: "¿Cómo gano rendimiento con VCOP?",
-      answer: "Múltiples oportunidades: 1) Proporciona liquidez en vaults de USDC, ETH, WBTC (5-20% APY), 2) Participa en liquidaciones (5% de bonificación), 3) Farming de liquidez en pools VCOP/USDC, 4) Arbitraje entre PSM y mercados externos."
+      question: "How do I earn yield with VCOP?",
+      answer: "Multiple opportunities: 1) Provide liquidity in USDC, ETH, WBTC vaults (5-20% APY), 2) Participate in liquidations (5% bonus), 3) Liquidity farming in VCOP/USDC pools, 4) Arbitrage between PSM and external markets."
     },
     {
-      question: "¿Qué pasa si el precio del peso cambia drásticamente?",
-      answer: "VCOP se ajusta automáticamente. Si el peso se devalúa, VCOP mantiene la paridad 1:1, protegiendo tu poder adquisitivo. El sistema PSM y los hooks de Uniswap v4 manejan volatilidad extrema manteniendo la estabilidad del protocolo."
+      question: "What happens if the peso price changes drastically?",
+      answer: "VCOP adjusts automatically. If the peso devalues, VCOP maintains 1:1 parity, protecting your purchasing power. The PSM system and Uniswap v4 hooks handle extreme volatility while maintaining protocol stability."
     },
     {
-      question: "¿Cuándo estará disponible en mainnet?",
-      answer: "Actualmente operamos en Base Sepolia con todas las funcionalidades. El lanzamiento en mainnet está programado para Q1 2025, después de completar la auditoría de Halborn y alcanzar nuestro objetivo de recaudación de $700,000."
+      question: "When will it be available on mainnet?",
+      answer: "We currently operate on Base Sepolia with full functionality. The mainnet launch is scheduled for Q1 2025, after completing the Halborn audit and reaching our fundraising goal of $700,000."
     }
   ];
 
@@ -647,11 +621,7 @@ function App() {
             {competitors.map((comp, index) => (
               <div 
                 key={index}
-                className={`grid grid-cols-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                  hoveredComparison === index ? 'bg-emerald-50' : ''
-                }`}
-                onMouseEnter={() => setHoveredComparison(index)}
-                onMouseLeave={() => setHoveredComparison(null)}
+                className="grid grid-cols-4 border-b border-gray-100 hover:bg-gray-50 transition-colors"
               >
                 <div className="p-6 font-medium text-gray-900">{comp.feature}</div>
                 <div className="p-6 text-emerald-600 font-semibold">{comp.vcop}</div>
@@ -668,110 +638,6 @@ function App() {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials Section */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-              Trusted by Latin American <span className="text-emerald-600">Crypto Users</span>
-            </h2>
-            <p className="text-xl text-gray-600">
-              Real stories from real users protecting their wealth
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <div key={index} className="bg-white rounded-2xl p-8 shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300">
-                <div className="flex items-center mb-6">
-                  <img 
-                    src={testimonial.avatar} 
-                    alt={testimonial.name}
-                    className="w-12 h-12 rounded-full mr-4"
-                  />
-                  <div>
-                    <div className="font-semibold text-gray-900">{testimonial.name}</div>
-                    <div className="text-sm text-gray-600">{testimonial.role}</div>
-                  </div>
-                </div>
-                
-                <div className="flex mb-4">
-                  {[...Array(testimonial.rating)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                  ))}
-                </div>
-                
-                <p className="text-gray-700 italic">"{testimonial.quote}"</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Yield Section */}
-      <section className="py-20 bg-gray-900 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/20 to-teal-900/20"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-4xl md:text-5xl font-bold mb-6">
-                Earn While You <span className="text-emerald-400">Protect</span>
-              </h2>
-              <div className="space-y-6 text-lg text-gray-300">
-                <p>
-                  Yield seekers can earn <strong className="text-emerald-400">5–20% APY</strong> in USDC, ETH, and WBTC vaults.
-                </p>
-                <p>
-                  Liquidators earn a <strong className="text-yellow-400">5% bounty</strong> for maintaining system health.
-                </p>
-                
-                <div className="grid grid-cols-2 gap-4 mt-8">
-                  <div className="bg-emerald-900/50 p-6 rounded-lg border border-emerald-500/30">
-                    <div className="text-3xl font-bold text-emerald-400 mb-2">5-20%</div>
-                    <div className="text-sm text-emerald-300">Vault APY</div>
-                    <div className="text-xs text-emerald-400 mt-2">USDC • ETH • WBTC</div>
-                  </div>
-                  <div className="bg-yellow-900/50 p-6 rounded-lg border border-yellow-500/30">
-                    <div className="text-3xl font-bold text-yellow-400 mb-2">5%</div>
-                    <div className="text-sm text-yellow-300">Liquidation Bonus</div>
-                    <div className="text-xs text-yellow-400 mt-2">Per liquidation</div>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col sm:flex-row gap-4 mt-8">
-                  <a 
-                    href="https://vcop-lime.vercel.app/" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="bg-emerald-500 hover:bg-emerald-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <PieChart className="w-5 h-5" />
-                    Start Earning
-                  </a>
-                  <button className="border border-emerald-500 text-emerald-400 hover:bg-emerald-500 hover:text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center gap-2">
-                    <Calculator className="w-5 h-5" />
-                    Calculate Yields
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="relative">
-              <img 
-                src="https://images.pexels.com/photos/6801874/pexels-photo-6801874.jpeg?auto=compress&cs=tinysrgb&w=800" 
-                alt="Cryptocurrency and financial growth"
-                className="rounded-2xl shadow-2xl"
-              />
-              <div className="absolute -top-6 -left-6 bg-emerald-500 p-4 rounded-2xl shadow-lg">
-                <BarChart3 className="w-8 h-8 text-white" />
-              </div>
-              <div className="absolute -bottom-6 -right-6 bg-yellow-500 p-4 rounded-2xl shadow-lg">
-                <TrendingUp className="w-8 h-8 text-white" />
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -807,75 +673,6 @@ function App() {
                 )}
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Traction Section */}
-      <section className="py-20 bg-gradient-to-r from-blue-50 to-indigo-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-              Built on <span className="text-blue-600">Base</span>
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              From the creator of Pixel Minter—bringing innovation to Latin American DeFi
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-            <div className="text-center p-8 bg-white rounded-2xl shadow-lg">
-              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Globe className="w-8 h-8 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Base Sepolia</h3>
-              <p className="text-gray-600 mb-4">Core contracts deployed and tested</p>
-              <div className="text-sm text-blue-600 font-medium">✓ Fully Operational</div>
-            </div>
-            <div className="text-center p-8 bg-white rounded-2xl shadow-lg">
-              <div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Lock className="w-8 h-8 text-emerald-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Security Ready</h3>
-              <p className="text-gray-600 mb-4">Full integration tests completed</p>
-              <div className="text-sm text-emerald-600 font-medium">✓ Audit Scheduled</div>
-            </div>
-            <div className="text-center p-8 bg-white rounded-2xl shadow-lg">
-              <div className="bg-yellow-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="w-8 h-8 text-yellow-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">50K Users</h3>
-              <p className="text-gray-600 mb-4">Target for first 12 months</p>
-              <div className="text-sm text-yellow-600 font-medium">🎯 Growth Goal</div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-8 text-center relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-blue-500/5"></div>
-            <div className="relative">
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                The Vision
-              </h3>
-              <p className="text-lg text-gray-700 max-w-4xl mx-auto leading-relaxed">
-                VCOP turns dormant crypto into spendable Colombian pesos—without killing your upside. 
-                We're raising <strong className="text-emerald-600">$700,000 pre-seed</strong> to fund a full Halborn audit, launch on mainnet, 
-                and help Latin America keep more of what it earns.
-              </p>
-              <div className="mt-6 flex items-center justify-center gap-8 text-sm text-gray-600">
-                <div className="flex items-center">
-                  <CheckCircle className="w-4 h-4 text-emerald-600 mr-2" />
-                  Halborn Audit
-                </div>
-                <div className="flex items-center">
-                  <CheckCircle className="w-4 h-4 text-emerald-600 mr-2" />
-                  Mainnet Launch
-                </div>
-                <div className="flex items-center">
-                  <CheckCircle className="w-4 h-4 text-emerald-600 mr-2" />
-                  50K Users
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </section>
