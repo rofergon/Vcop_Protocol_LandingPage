@@ -42,20 +42,26 @@ const CandlestickChart: React.FC<{ data: typeof HISTORICAL_DATA, height?: number
   data, 
   height = 160 
 }) => {
-  const maxRate = Math.max(...data.map(d => d.rate));
-  const minRate = Math.min(...data.map(d => d.rate));
-  const range = maxRate - minRate;
+  // Convert exchange rates to purchasing power relative to 2014 (base = 100%)
+  const purchasingPowerData = data.map(point => ({
+    ...point,
+    purchasingPower: (BASE_RATE / point.rate) * 100 // Inverted to show devaluation
+  }));
+
+  const maxPower = Math.max(...purchasingPowerData.map(d => d.purchasingPower));
+  const minPower = Math.min(...purchasingPowerData.map(d => d.purchasingPower));
+  const range = maxPower - minPower;
   const padding = range * 0.1;
   
   const chartWidth = 320;
   const candleWidth = Math.max(8, (chartWidth - 40) / data.length - 2);
   
-  const getY = (rate: number) => {
-    return height - 25 - ((rate - minRate + padding) / (range + 2 * padding)) * (height - 50);
+  const getY = (power: number) => {
+    return height - 25 - ((power - minPower + padding) / (range + 2 * padding)) * (height - 50);
   };
   
   const getColor = (current: number, previous: number) => {
-    return current >= previous ? '#10b981' : '#ef4444';
+    return current >= previous ? '#10b981' : '#ef4444'; // Green if retaining power, red if losing
   };
 
   // Calculate purchasing power loss percentage for each point
@@ -87,26 +93,26 @@ const CandlestickChart: React.FC<{ data: typeof HISTORICAL_DATA, height?: number
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <BarChart3 className="w-4 h-4 text-emerald-400" />
-          <span className="text-white font-semibold text-sm">📉 Devaluación Histórica COP/USD</span>
+          <span className="text-white font-semibold text-sm">📉 Pérdida Poder Adquisitivo COP</span>
         </div>
         <div className="flex items-center gap-1 text-red-400 text-xs font-mono">
           <TrendingDown className="w-3 h-3" />
-          <span>+{getPowerLossPercent(data[data.length - 1].rate).toFixed(0)}%</span>
+          <span>-{(100 - purchasingPowerData[purchasingPowerData.length - 1].purchasingPower).toFixed(0)}%</span>
         </div>
       </div>
 
       <svg width="100%" height={height} className="overflow-visible">
-        {data.map((point, index) => {
+        {purchasingPowerData.map((point, index) => {
           const x = 40 + index * (candleWidth + 10);
-          const y = getY(point.rate);
-          const prevRate = index > 0 ? data[index - 1].rate : point.rate;
-          const color = getColor(point.rate, prevRate);
-          const isPositive = point.rate >= prevRate;
-          const powerLoss = getPowerLossPercent(point.rate);
+          const y = getY(point.purchasingPower);
+          const prevPower = index > 0 ? purchasingPowerData[index - 1].purchasingPower : point.purchasingPower;
+          const color = getColor(point.purchasingPower, prevPower);
+          const isPositive = point.purchasingPower >= prevPower;
+          const powerLoss = 100 - point.purchasingPower;
           
           // Enhanced candlestick with purchasing power visualization
-          const bodyHeight = Math.max(6, Math.abs(y - getY(prevRate)));
-          const bodyY = isPositive ? getY(point.rate) : getY(prevRate);
+          const bodyHeight = Math.max(6, Math.abs(y - getY(prevPower)));
+          const bodyY = isPositive ? getY(point.purchasingPower) : getY(prevPower);
           
           return (
             <g key={index}>
@@ -162,7 +168,7 @@ const CandlestickChart: React.FC<{ data: typeof HISTORICAL_DATA, height?: number
                   textAnchor="middle"
                   className="font-mono font-bold"
                 >
-                  ${point.rate.toLocaleString()}
+                  {point.purchasingPower.toFixed(1)}%
                 </text>
                 <text
                   x={x}
@@ -172,31 +178,31 @@ const CandlestickChart: React.FC<{ data: typeof HISTORICAL_DATA, height?: number
                   textAnchor="middle"
                   className="font-mono"
                 >
-                  -{powerLoss.toFixed(0)}% poder
+                  -{powerLoss.toFixed(0)}% perdido
                 </text>
               </g>
             </g>
           );
         })}
         
-        {/* Trend line */}
+        {/* Trend line showing decline */}
         <path
-          d={`M ${30} ${getY(data[0].rate)} ${data.map((point, index) => 
-            `L ${30 + index * (candleWidth + 2)} ${getY(point.rate)}`
+          d={`M ${40} ${getY(purchasingPowerData[0].purchasingPower)} ${purchasingPowerData.map((point, index) => 
+            `L ${40 + index * (candleWidth + 10)} ${getY(point.purchasingPower)}`
           ).join(' ')}`}
           fill="none"
-          stroke="rgba(239, 68, 68, 0.3)"
-          strokeWidth="1"
-          strokeDasharray="2,2"
+          stroke="rgba(239, 68, 68, 0.4)"
+          strokeWidth="2"
+          strokeDasharray="3,3"
         />
       </svg>
       
-      {/* Price axis labels */}
-      <div className="absolute left-1 top-8 text-xs text-emerald-400 font-mono">
-        ${maxRate.toLocaleString()}
+      {/* Price axis labels - now showing percentages */}
+      <div className="absolute left-1 top-10 text-xs text-emerald-400 font-mono">
+        {maxPower.toFixed(0)}%
       </div>
       <div className="absolute left-1 bottom-10 text-xs text-red-400 font-mono">
-        ${minRate.toLocaleString()}
+        {minPower.toFixed(0)}%
       </div>
     </div>
   );
