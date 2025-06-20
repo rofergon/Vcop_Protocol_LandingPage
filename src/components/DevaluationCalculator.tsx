@@ -70,9 +70,9 @@ const CandlestickChart: React.FC<{ data: typeof HISTORICAL_DATA, height?: number
   };
 
   return (
-    <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg p-3 relative overflow-hidden border border-gray-700">
+    <div className="bg-gradient-to-br from-gray-50 to-white rounded-lg p-3 relative overflow-hidden border border-gray-300 shadow-sm">
       {/* Background grid with gradient */}
-      <div className="absolute inset-0 opacity-10">
+      <div className="absolute inset-0 opacity-20">
         <svg width="100%" height={height}>
           {[0.2, 0.4, 0.6, 0.8].map((ratio, i) => (
             <line
@@ -81,7 +81,7 @@ const CandlestickChart: React.FC<{ data: typeof HISTORICAL_DATA, height?: number
               y1={25 + ratio * (height - 50)}
               x2={chartWidth + 20}
               y2={25 + ratio * (height - 50)}
-              stroke="#374151"
+              stroke="#d1d5db"
               strokeWidth="1"
               strokeDasharray="3,3"
             />
@@ -92,11 +92,11 @@ const CandlestickChart: React.FC<{ data: typeof HISTORICAL_DATA, height?: number
       {/* Title and trend */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-emerald-400" />
-          <span className="text-white font-semibold text-sm">📉 Pérdida Poder Adquisitivo COP</span>
+          <BarChart3 className="w-4 h-4 text-emerald-600" />
+          <span className="text-gray-800 font-semibold text-sm">📉 COP Purchasing Power Loss 2014-2025</span>
         </div>
-        <div className="flex items-center gap-1 text-red-400 text-xs font-mono">
-          <TrendingDown className="w-3 h-3" />
+        <div className="flex items-center gap-1 text-red-600 text-sm font-mono font-bold">
+          <TrendingDown className="w-5 h-5" />
           <span>-{(100 - purchasingPowerData[purchasingPowerData.length - 1].purchasingPower).toFixed(0)}%</span>
         </div>
       </div>
@@ -140,7 +140,7 @@ const CandlestickChart: React.FC<{ data: typeof HISTORICAL_DATA, height?: number
               <text
                 x={x}
                 y={height - 8}
-                fill="#9CA3AF"
+                fill="#6B7280"
                 fontSize="7"
                 textAnchor="middle"
                 className="font-mono"
@@ -155,31 +155,32 @@ const CandlestickChart: React.FC<{ data: typeof HISTORICAL_DATA, height?: number
                   y={y - 30}
                   width="70"
                   height="25"
-                  fill="#1F2937"
+                  fill="white"
                   rx="3"
                   stroke={color}
                   strokeWidth="1"
+                  style={{filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'}}
                 />
                 <text
                   x={x}
                   y={y - 20}
-                  fill="white"
+                  fill="#1F2937"
                   fontSize="7"
                   textAnchor="middle"
                   className="font-mono font-bold"
                 >
                   {point.purchasingPower.toFixed(1)}%
                 </text>
-                <text
-                  x={x}
-                  y={y - 12}
-                  fill={powerLoss > 50 ? "#ef4444" : "#f59e0b"}
-                  fontSize="6"
-                  textAnchor="middle"
-                  className="font-mono"
-                >
-                  -{powerLoss.toFixed(0)}% perdido
-                </text>
+                                  <text
+                    x={x}
+                    y={y - 12}
+                    fill={powerLoss > 50 ? "#dc2626" : "#d97706"}
+                    fontSize="6"
+                    textAnchor="middle"
+                    className="font-mono"
+                  >
+                    -{powerLoss.toFixed(0)}% lost
+                  </text>
               </g>
             </g>
           );
@@ -198,10 +199,10 @@ const CandlestickChart: React.FC<{ data: typeof HISTORICAL_DATA, height?: number
       </svg>
       
       {/* Price axis labels - now showing percentages */}
-      <div className="absolute left-1 top-10 text-xs text-emerald-400 font-mono">
+      <div className="absolute left-1 top-10 text-xs text-emerald-600 font-mono font-semibold">
         {maxPower.toFixed(0)}%
       </div>
-      <div className="absolute left-1 bottom-10 text-xs text-red-400 font-mono">
+      <div className="absolute left-1 bottom-10 text-xs text-red-600 font-mono font-semibold">
         {minPower.toFixed(0)}%
       </div>
     </div>
@@ -246,8 +247,8 @@ export const DevaluationCalculator: React.FC<DevaluationCalculatorProps> = ({ cl
       <div className="bg-gradient-to-r from-red-500 to-orange-500 p-3 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-bold">💸 Calculadora Devaluación Peso</h3>
-            <p className="text-red-100 text-xs">Datos reales 2014-2025</p>
+            <h3 className="text-lg font-bold">💸 Peso Devaluation Calculator</h3>
+                          <p className="text-red-100 text-xs">Real data 2014-2025</p>
           </div>
           <div className="bg-white/20 p-2 rounded-lg">
             <TrendingDown className="w-5 h-5" />
@@ -332,9 +333,9 @@ export const DevaluationCalculator: React.FC<DevaluationCalculatorProps> = ({ cl
             {/* Key insight */}
             <div className="mt-3 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
               <div className="text-center text-sm">
-                <span className="font-semibold text-yellow-800">🎯 VCOP te ahorró: </span>
+                                  <span className="font-semibold text-yellow-800">🎯 VCOP saved you: </span>
                 <span className="text-yellow-700 font-bold">
-                  {formatCurrency(Math.abs(realLoss))} en {HISTORICAL_DATA.length / 2} años!
+                  {formatCurrency(Math.abs(realLoss))} in {HISTORICAL_DATA.length / 2} years!
                 </span>
               </div>
             </div>
