@@ -396,55 +396,43 @@ function App() {
         </div>
       </section>
 
-      {/* Interactive Loan Demo Section */}
-      <section className="py-20 bg-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 to-teal-50 opacity-50"></div>
+      {/* Combined Interactive Demo Section */}
+      <section className="py-16 bg-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 via-white to-red-50 opacity-60"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-emerald-100 text-emerald-800 border border-emerald-200 mb-6">
-              <CheckCircle className="w-4 h-4 mr-2" />
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-gradient-to-r from-emerald-100 to-red-100 text-gray-800 border border-gray-200 mb-6">
+              <CheckCircle className="w-4 h-4 mr-2 text-emerald-600" />
               Experience the Solution
+              <AlertTriangle className="w-4 h-4 ml-2 text-red-600" />
             </div>
             
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               Try VCOP's <span className="text-emerald-600 relative">
                 Ultra-Flexible Engine
                 <div className="absolute bottom-0 left-0 w-full h-1 bg-emerald-600/30"></div>
               </span>
-            </h2>
-            
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed mb-12">
-              Experience our revolutionary lending system that allows ANY ratio - even beyond 100% LTV! See how VCOP breaks traditional DeFi limitations while providing intelligent risk insights.
-            </p>
-          </div>
-
-          <InteractiveLoanDemo />
-        </div>
-      </section>
-
-      {/* Interactive Devaluation Calculator Section */}
-      <section className="py-20 bg-gray-50 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-red-50 to-orange-50 opacity-50"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-red-100 text-red-800 border border-red-200 mb-6">
-              <AlertTriangle className="w-4 h-4 mr-2" />
-              The Crisis Deepens
-            </div>
-            
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+              {' & '}
               Calculate Your <span className="text-red-600 relative">
                 Real Losses
                 <div className="absolute bottom-0 left-0 w-full h-1 bg-red-600/30"></div>
               </span>
             </h2>
             
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed mb-12">
-              See exactly how much purchasing power you've lost to peso devaluation and how VCOP could have protected you.
+            <p className="text-lg text-gray-600 max-w-4xl mx-auto leading-relaxed mb-8">
+              Experience our revolutionary lending system AND see exactly how peso devaluation has affected your purchasing power.
             </p>
           </div>
 
-          <DevaluationCalculator />
+          {/* Horizontal Layout */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="w-full">
+              <InteractiveLoanDemo className="w-full h-auto" />
+            </div>
+            <div className="w-full">
+              <DevaluationCalculator className="w-full h-auto" />
+            </div>
+          </div>
         </div>
       </section>
 
