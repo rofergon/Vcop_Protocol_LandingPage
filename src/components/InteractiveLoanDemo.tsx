@@ -82,8 +82,7 @@ const EASY_PRESETS = [
   { name: "Conservative", ltv: 60, description: "Safe and stable", color: "green" },
   { name: "Moderate", ltv: 75, description: "Balanced approach", color: "blue" },
   { name: "Aggressive", ltv: 90, description: "Higher leverage", color: "yellow" },
-  { name: "Extreme", ltv: 95, description: "Maximum leverage", color: "orange" },
-  { name: "VCOP Ultra", ltv: 105, description: "Beyond limits!", color: "red" }
+  { name: "Extreme", ltv: 95, description: "Maximum leverage", color: "orange" }
 ];
 
 // Asset icon component
@@ -314,7 +313,7 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
                 <Target className="w-4 h-4 text-emerald-600" />
                 Risk Level
               </h4>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {EASY_PRESETS.map((preset, index) => (
                   <button
                     key={index}
@@ -346,12 +345,12 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
                 <input
                   type="range"
                   min="10"
-                  max="120"
+                  max="95"
                   value={easyLTV}
                   onChange={(e) => setEasyLTV(parseInt(e.target.value))}
                   className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                   style={{
-                    background: `linear-gradient(to right, #10b981 0%, #3b82f6 60%, #f59e0b 75%, #ef4444 90%, #dc2626 100%)`
+                    background: `linear-gradient(to right, #10b981 0%, #3b82f6 60%, #f59e0b 75%, #ef4444 90%)`
                   }}
                 />
                 <div className="flex justify-between text-xs text-gray-500">
@@ -599,7 +598,7 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
                   <div className="mt-2 h-2 bg-blue-200 rounded-full overflow-hidden">
                     <div
                       className={`h-full transition-all duration-500 ${getLTVColor(currentLTV)}`}
-                      style={{ width: `${Math.min(currentLTV, 120) / 120 * 100}%` }}
+                      style={{ width: `${Math.min(currentLTV, 95) / 95 * 100}%` }}
                     />
                   </div>
                 </div>
