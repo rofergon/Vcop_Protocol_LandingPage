@@ -286,13 +286,13 @@ function App() {
                   lg:p-8 lg:max-w-lg">
                   <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-yellow-500/10"></div>
                   <div className="relative">
-                    <div className="flex items-center justify-between mb-3 md:mb-4">
+                    <div className="flex items-center justify-between mb-2 md:mb-4">
                       <div className="text-xs md:text-sm text-emerald-300">Live Data</div>
                       <button 
                         onClick={() => setIsPlaying(!isPlaying)}
                         className="text-emerald-300 hover:text-white transition-colors"
                       >
-                        {isPlaying ? <Pause className="w-3 h-3 md:w-4 md:h-4" /> : <Play className="w-3 h-3 md:w-4 md:h-4" />}
+                        {isPlaying ? <Pause className="w-3 h-3 md:w-4 md:h-4" /> : <Play className="w-2 h-3 md:w-4 md:h-4" />}
                       </button>
                     </div>
                     <div className={`font-bold mb-2 transition-colors duration-500 ${stats[currentStat].color}

@@ -26,11 +26,12 @@ const BASE_RATE = 2000.69;
 
 export const DevaluationCalculator: React.FC<DevaluationCalculatorProps> = ({ className = "" }) => {
   const [initialAmount, setInitialAmount] = useState(1000000); // 1M COP
-  const [selectedYear, setSelectedYear] = useState(2014);
-  const [currentYear, setCurrentYear] = useState(2024);
   const [isAnimating, setIsAnimating] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
 
+  // Fixed years for 2014-2024 comparison
+  const selectedYear = 2014;
+  const currentYear = 2024;
   const initialData = HISTORICAL_DATA.find(d => d.year === selectedYear);
   const currentData = HISTORICAL_DATA.find(d => d.year === currentYear);
 
@@ -51,7 +52,7 @@ export const DevaluationCalculator: React.FC<DevaluationCalculatorProps> = ({ cl
     setIsAnimating(true);
     const timer = setTimeout(() => setIsAnimating(false), 500);
     return () => clearTimeout(timer);
-  }, [initialAmount, selectedYear, currentYear]);
+  }, [initialAmount]);
 
   // Input validation
   const handleAmountChange = (value: string) => {
@@ -68,16 +69,7 @@ export const DevaluationCalculator: React.FC<DevaluationCalculatorProps> = ({ cl
     setInitialAmount(numValue);
   };
 
-  const handleYearChange = (year: number, type: 'initial' | 'current') => {
-    if (type === 'initial') {
-      setSelectedYear(year);
-      if (year > currentYear) {
-        setCurrentYear(year);
-      }
-    } else {
-      setCurrentYear(year);
-    }
-  };
+
 
   const formatCurrency = (amount: number, currency: 'COP' | 'USD' = 'COP') => {
     if (currency === 'USD') {
@@ -100,11 +92,11 @@ export const DevaluationCalculator: React.FC<DevaluationCalculatorProps> = ({ cl
     <div className={`bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden ${className}`}>
       {/* Header */}
       <div className="bg-gradient-to-r from-red-500 to-orange-500 p-4 text-white">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-2">
           <div>
             <h3 className="text-lg font-bold mb-1">Peso Devaluation Calculator</h3>
-            <p className="text-red-100 mb-1 text-sm">💸 How much have you lost?</p>
-            <div className="flex items-center gap-2 text-xs text-red-100">
+            <p className="text-red-100 text-sm">💸 How much have you lost?</p>
+            <div className="flex items-center gap-2 text-xs text-red-100 mt-1">
               <Info className="w-3 h-3" />
               <span>Real historical data</span>
             </div>
@@ -113,109 +105,67 @@ export const DevaluationCalculator: React.FC<DevaluationCalculatorProps> = ({ cl
             <TrendingDown className="w-6 h-6" />
           </div>
         </div>
+        
+        {/* Additional padding to match RiskCalculator height */}
+        <div className="h-10"></div>
       </div>
 
-      <div className="p-4">
-        {/* Input Controls */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-          <div>
-            <label htmlFor="initial-amount" className="block text-xs font-medium text-gray-700 mb-1">
-              💰 Amount (COP)
-            </label>
-            <input
-              id="initial-amount"
-              type="number"
-              step="100000"
-              min="0"
-              value={initialAmount}
-              onChange={(e) => handleAmountChange(e.target.value)}
-              className={`w-full p-2 text-sm border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 ${
-                inputError ? 'border-red-500 bg-red-50' : 'border-gray-300'
-              }`}
-              placeholder="1,000,000"
-            />
-            {inputError && (
-              <p className="text-red-600 text-xs mt-1">{inputError}</p>
-            )}
-          </div>
-          
-          <div>
-            <label htmlFor="starting-year" className="block text-xs font-medium text-gray-700 mb-1">
-              📅 From Year
-            </label>
-            <select
-              id="starting-year"
-              value={selectedYear}
-              onChange={(e) => handleYearChange(Number(e.target.value), 'initial')}
-              className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-            >
-              {HISTORICAL_DATA.map(data => (
-                <option key={data.year} value={data.year}>{data.year}</option>
+      <div className="p-3">
+                {/* Amount Selector */}
+        <div className="mb-1">
+          <h4 className="text-base font-semibold text-gray-900 mb-1 flex items-center gap-2">
+            <Calculator className="w-4 h-4 text-red-600" />
+            Loss Calculator
+          </h4>
+          <div className="bg-gradient-to-r from-blue-50 to-red-50 rounded-lg p-3 border border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-800 flex items-center gap-1">
+                <DollarSign className="w-4 h-4" />
+                💰 Select your COP amount (2014-2024):
+              </span>
+              <span className="text-lg font-bold text-red-600">-{purchasingPowerLost.toFixed(1)}%</span>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {[500000, 1000000, 5000000, 10000000].map((amount) => (
+                <button
+                  key={amount}
+                  onClick={() => setInitialAmount(amount)}
+                  className={`p-2 rounded-lg border-2 transition-all duration-300 text-center ${
+                    initialAmount === amount
+                      ? 'border-red-500 bg-red-50 shadow-md'
+                      : 'border-gray-200 hover:border-red-300 hover:bg-red-50'
+                  }`}
+                >
+                  <div className="text-base font-bold text-gray-900">
+                    {(amount / 1000000).toFixed(amount < 1000000 ? 1 : 0)}M
+                  </div>
+                  <div className="text-xs text-gray-600">COP</div>
+                </button>
               ))}
-            </select>
-          </div>
-          
-          <div>
-            <label htmlFor="compare-year" className="block text-xs font-medium text-gray-700 mb-1">
-              📊 To Year
-            </label>
-            <select
-              id="compare-year"
-              value={currentYear}
-              onChange={(e) => handleYearChange(Number(e.target.value), 'current')}
-              className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-            >
-              {HISTORICAL_DATA.filter(d => d.year >= selectedYear).map(data => (
-                <option key={data.year} value={data.year}>{data.year}</option>
-              ))}
-            </select>
+            </div>
+            <div className="mt-2 text-center">
+              <span className="text-sm text-gray-600">Selected: </span>
+              <span className="font-bold text-gray-900">{formatCurrency(initialAmount)}</span>
+            </div>
           </div>
         </div>
 
         {/* Results Display */}
         <div className={`transition-all duration-500 ${isAnimating ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}>
-          {/* Exchange Rate Comparison */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-            <div className="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-500 text-center">
-              <div className="text-sm font-semibold text-blue-800 mb-1">
-                💵 {selectedYear}
-              </div>
-              <div className="text-lg font-bold text-blue-900">
-                {initialData?.rate.toLocaleString()} COP/USD
-              </div>
-              <div className="text-xs text-blue-700">
-                {formatCurrency(initialUSDValue, 'USD')}
-              </div>
-            </div>
-            
-            <div className="bg-red-50 p-3 rounded-lg border-l-4 border-red-500 text-center">
-              <div className="text-sm font-semibold text-red-800 mb-1">
-                📉 {currentYear}
-              </div>
-              <div className="text-lg font-bold text-red-900">
-                {currentData?.rate.toLocaleString()} COP/USD
-              </div>
-              <div className="text-xs text-red-700">
-                {formatCurrency(currentCOPValue)}
-              </div>
-            </div>
-          </div>
-
           {/* Impact Analysis */}
-          <div className="bg-gradient-to-r from-red-50 to-orange-50 p-3 rounded-lg border border-red-200 mb-3">
-            <div className="flex items-center mb-2">
-              <AlertTriangle className="w-4 h-4 text-red-600 mr-2" />
+          <div className="bg-gradient-to-r from-red-50 to-orange-50 p-3 rounded-lg border border-red-200 mb-4">
+            <div className="flex items-center justify-between mb-2">
               <h4 className="text-base font-bold text-red-800">💸 Impact on Your Money</h4>
+              <div className="text-lg font-bold text-red-800">
+                -{purchasingPowerLost.toFixed(1)}%
+              </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <div className="text-center bg-white p-2 rounded-lg">
                 <div className="text-xs text-gray-600 mb-1">💰 Real Value</div>
                 <div className="text-sm font-bold text-red-600">
                   {formatCurrency(realValue)}
-                </div>
-                <div className="text-xs text-red-500">
-                  What you can buy
                 </div>
               </div>
               
@@ -224,34 +174,25 @@ export const DevaluationCalculator: React.FC<DevaluationCalculatorProps> = ({ cl
                 <div className="text-sm font-bold text-red-700">
                   {formatCurrency(Math.abs(realLoss))}
                 </div>
-                <div className="text-xs text-red-500">
-                  Money lost
-                </div>
               </div>
               
               <div className="text-center bg-white p-2 rounded-lg">
-                <div className="text-xs text-gray-600 mb-1">⚠️ Power Lost</div>
-                <div className="text-lg font-bold text-red-800">
-                  -{purchasingPowerLost.toFixed(1)}%
-                </div>
-                <div className="text-xs text-red-500">
-                  Due to devaluation
+                <div className="text-xs text-gray-600 mb-1">🚀 VCOP</div>
+                <div className="text-sm font-bold text-emerald-600">
+                  {formatCurrency(initialAmount)}
                 </div>
               </div>
             </div>
           </div>
 
           {/* VCOP Solution */}
-          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 p-3 rounded-lg border border-emerald-200">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-base font-bold text-emerald-800">
-                🚀 How VCOP Protects You
-              </h4>
-              <Calculator className="w-5 h-5 text-emerald-600" />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <div className="bg-white p-2 rounded-lg border-2 border-red-200 text-center">
+          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 p-3 rounded-lg border border-emerald-200 mb-4">
+            <h5 className="font-semibold text-emerald-900 mb-2 flex items-center gap-2">
+              <Calculator className="w-4 h-4" />
+              🚀 How VCOP Protects You
+            </h5>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="text-center bg-white p-2 rounded-lg border-2 border-red-200">
                 <div className="text-xs text-red-600 mb-1 font-medium">💸 Traditional</div>
                 <div className="text-sm font-bold text-red-600">
                   Lost {formatCurrency(Math.abs(realLoss))}
@@ -261,7 +202,7 @@ export const DevaluationCalculator: React.FC<DevaluationCalculatorProps> = ({ cl
                 </div>
               </div>
               
-              <div className="bg-white p-2 rounded-lg border-2 border-emerald-200 text-center">
+              <div className="text-center bg-white p-2 rounded-lg border-2 border-emerald-200">
                 <div className="text-xs text-emerald-600 mb-1 font-medium">🚀 VCOP</div>
                 <div className="text-sm font-bold text-emerald-600">
                   Kept {formatCurrency(initialAmount)}
@@ -272,14 +213,48 @@ export const DevaluationCalculator: React.FC<DevaluationCalculatorProps> = ({ cl
               </div>
             </div>
           </div>
+
+          {/* Live Impact */}
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 border border-purple-200">
+            <h5 className="font-semibold text-purple-900 mb-2 flex items-center gap-2">
+              <TrendingDown className="w-4 h-4" />
+              📊 Live Impact
+            </h5>
+            
+            <div className="grid grid-cols-3 gap-2">
+              <div className="text-center bg-white p-2 rounded-lg">
+                <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${
+                  purchasingPowerLost > 50 
+                    ? 'bg-red-100 text-red-600' 
+                    : purchasingPowerLost > 20 
+                    ? 'bg-yellow-100 text-yellow-600' 
+                    : 'bg-green-100 text-green-600'
+                }`}>
+                  {purchasingPowerLost > 50 ? <AlertTriangle className="w-3 h-3" /> : <Info className="w-3 h-3" />}
+                </div>
+                <div className="text-xs text-gray-600 mt-1">Risk</div>
+              </div>
+              
+              <div className="text-center bg-white p-2 rounded-lg">
+                <div className="text-sm font-bold text-gray-900">
+                  {purchasingPowerLost > 50 ? '0.8' : purchasingPowerLost > 20 ? '1.2' : '1.8'}
+                </div>
+                <div className="text-xs text-gray-600">Health</div>
+              </div>
+              
+              <div className="text-center bg-white p-2 rounded-lg">
+                <div className="text-sm font-bold text-gray-900">
+                  {purchasingPowerLost.toFixed(1)}%
+                </div>
+                <div className="text-xs text-gray-600">Loss</div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-gray-200 mt-3">
-          <button 
-            className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 text-sm rounded-lg transition-all flex items-center justify-center gap-2"
-            disabled={!!inputError}
-          >
+        <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-gray-200 mt-4">
+          <button className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 text-sm rounded-lg transition-all flex items-center justify-center gap-2">
             <Calculator className="w-4 h-4" />
             🚀 Protect with VCOP
             <ArrowRight className="w-4 h-4" />
@@ -288,8 +263,6 @@ export const DevaluationCalculator: React.FC<DevaluationCalculatorProps> = ({ cl
           <button 
             onClick={() => {
               setInitialAmount(1000000);
-              setSelectedYear(2014);
-              setCurrentYear(2024);
               setInputError(null);
             }}
             className="border-2 border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2 px-4 text-sm rounded-lg transition-all flex items-center justify-center gap-2"

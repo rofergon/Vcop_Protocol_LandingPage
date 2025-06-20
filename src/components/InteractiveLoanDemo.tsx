@@ -176,7 +176,7 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
     <div className={`bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden ${className}`}>
       {/* Header */}
       <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-4 text-white">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-1">
           <div>
             <h3 className="text-lg font-bold mb-1">VCOP Flexible Risk Calculator</h3>
             <p className="text-emerald-100 text-sm">ANY ratio allowed! 🚀</p>
@@ -219,7 +219,7 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-5">
         {isEasyMode ? (
           /* EASY MODE INTERFACE */
           <div className="space-y-4">
@@ -248,7 +248,7 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
             </div>
 
             {/* Visual LTV Slider */}
-            <div className="bg-gray-50 rounded-lg p-3">
+            <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
                 <h5 className="font-semibold text-gray-900 flex items-center gap-2">
                   <Sliders className="w-4 h-4 text-blue-600" />
@@ -257,7 +257,7 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
               </div>
               
               {/* LTV Slider */}
-              <div className="relative mb-2">
+              <div className="relative mb-3">
                 <input
                   type="range"
                   min="10"
@@ -286,7 +286,7 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
                   💰 Collateral
                 </h5>
                 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <select
                     value={easyCollateralAsset}
                     onChange={(e) => setEasyCollateralAsset(e.target.value)}
@@ -320,7 +320,7 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
               </div>
 
               {/* Loan Section */}
-              <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-200">
+              <div className="bg-emerald-50 rounded-lg p-3.5 border border-emerald-200">
                 <h5 className="font-semibold text-emerald-900 mb-2 flex items-center gap-2">
                   <DollarSign className="w-4 h-4" />
                   📈 Loan
