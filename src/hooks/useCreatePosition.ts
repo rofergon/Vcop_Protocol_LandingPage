@@ -96,14 +96,10 @@ const ERC20_ABI = [
 
 export function useCreatePosition({
   addresses,
-  autoVerifyBalances = true,
-  minETHBalance = parseUnits('0.1', 18),
-  minUSDCBalance = parseUnits('100', 6)
+  autoVerifyBalances = true
 }: {
   addresses: ContractAddresses
   autoVerifyBalances?: boolean
-  minETHBalance?: bigint
-  minUSDCBalance?: bigint
 }) {
   
   const [state, setState] = useState<CreatePositionState>({
@@ -187,27 +183,43 @@ export function useCreatePosition({
     })
   }, [])
 
-  const checkBalances = useCallback(() => {
-    if (!autoVerifyBalances || !ethBalance || !usdcBalance) {
+  const checkBalances = useCallback((terms?: Partial<LoanTerms>) => {
+    if (!autoVerifyBalances) {
       return { valid: true, message: 'Balance check skipped' }
     }
 
-    if (ethBalance.value < minETHBalance) {
-      return {
-        valid: false,
-        message: `Need ${formatUnits(minETHBalance, 18)} ETH, have ${formatUnits(ethBalance.value, 18)} ETH`
+    // Determinar qué asset es el collateral y cuánto necesitamos
+    const collateralAsset = terms?.collateralAsset || addresses.mockETH
+    const collateralAmount = terms?.collateralAmount || parseUnits('1', 18)
+    
+    // Solo validar balance del asset de COLLATERAL (lo que necesitas dar)
+    if (collateralAsset === addresses.mockETH) {
+      if (!ethBalance) {
+        return { valid: false, message: 'ETH balance not loaded' }
+      }
+      
+      if (ethBalance.value < collateralAmount) {
+        return {
+          valid: false,
+          message: `Need ${formatUnits(collateralAmount, 18)} ETH for collateral, have ${formatUnits(ethBalance.value, 18)} ETH`
+        }
+      }
+    } else if (collateralAsset === addresses.mockUSDC) {
+      if (!usdcBalance) {
+        return { valid: false, message: 'USDC balance not loaded' }
+      }
+      
+      if (usdcBalance.value < collateralAmount) {
+        return {
+          valid: false,
+          message: `Need ${formatUnits(collateralAmount, 6)} USDC for collateral, have ${formatUnits(usdcBalance.value, 6)} USDC`
+        }
       }
     }
-
-    if (usdcBalance.value < minUSDCBalance) {
-      return {
-        valid: false,
-        message: `Need ${formatUnits(minUSDCBalance, 6)} USDC, have ${formatUnits(usdcBalance.value, 6)} USDC`
-      }
-    }
-
-    return { valid: true, message: 'Balances sufficient' }
-  }, [ethBalance, usdcBalance, minETHBalance, minUSDCBalance, autoVerifyBalances])
+    
+    // NO validamos el balance del loan asset (es lo que recibes)
+    return { valid: true, message: 'Collateral balance sufficient' }
+  }, [ethBalance, usdcBalance, autoVerifyBalances, addresses])
 
   // ===================================
   // 🎯 FUNCIÓN PRINCIPAL
@@ -227,18 +239,7 @@ export function useCreatePosition({
         success: false
       })
 
-      // Step 1: Verificar balances
-      const balanceCheck = checkBalances()
-      if (!balanceCheck.valid) {
-        updateState({ 
-          error: balanceCheck.message,
-          isLoading: false,
-          step: 'idle'
-        })
-        return
-      }
-
-      // Step 2: Términos por defecto
+      // Step 1: Términos por defecto
       const defaultTerms: LoanTerms = {
         collateralAsset: addresses.mockETH,
         loanAsset: addresses.mockUSDC,
@@ -250,6 +251,17 @@ export function useCreatePosition({
       }
 
       const finalTerms = { ...defaultTerms, ...customTerms }
+
+      // Step 2: Verificar balances del collateral únicamente
+      const balanceCheck = checkBalances(finalTerms)
+      if (!balanceCheck.valid) {
+        updateState({ 
+          error: balanceCheck.message,
+          isLoading: false,
+          step: 'idle'
+        })
+        return
+      }
 
       // Step 3: Verificar allowance y aprobar si es necesario
       const currentAllowance = ethAllowance || 0n
@@ -362,12 +374,12 @@ export function useCreatePosition({
       eth: ethBalance ? {
         value: ethBalance.value,
         formatted: formatUnits(ethBalance.value, 18),
-        sufficient: ethBalance.value >= minETHBalance
+        sufficient: true // Balance check is done dynamically based on collateral amount
       } : null,
       usdc: usdcBalance ? {
         value: usdcBalance.value,
         formatted: formatUnits(usdcBalance.value, 6),
-        sufficient: usdcBalance.value >= minUSDCBalance
+        sufficient: true // This is the loan asset (what you receive), not needed upfront
       } : null
     },
     
