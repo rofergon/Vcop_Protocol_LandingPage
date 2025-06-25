@@ -25,6 +25,7 @@ import { useAppKit } from '@reown/appkit/react';
 import { useCreatePosition, BASE_SEPOLIA_ADDRESSES } from '../../hooks/useCreatePosition';
 import type { LoanTerms } from '../../hooks/useCreatePosition';
 import { parseUnits } from 'viem';
+import MockETHFaucet from './MockETHFaucet';
 
 // Asset icon component
 const AssetIcon: React.FC<{ asset: string; className?: string }> = ({ asset, className = "w-5 h-5" }) => {
@@ -260,7 +261,12 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
   const healthFactor = formatHealthFactor(isEasyMode ? easyLTV : currentLTV);
 
   return (
-    <div className={`p-0 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden ${className}`}>
+    <div className={`relative p-0 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden ${className}`}>
+      {/* Faucet en esquina superior */}
+      <div className="absolute top-2 right-2 z-10">
+        <MockETHFaucet />
+      </div>
+      
       {/* Header */}
       <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-4 text-white">
         <div className="flex items-center justify-between mb-1">
