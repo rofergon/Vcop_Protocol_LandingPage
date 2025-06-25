@@ -33,6 +33,9 @@ import {
 } from 'lucide-react';
 import { InteractiveLoanDemo } from './components/InteractiveLoanDemo';
 import { DevaluationCalculator } from './components/DevaluationCalculator';
+import LoanApp from './app/index';
+import { useAppKit } from '@reown/appkit/react';
+import { useAccount } from 'wagmi';
 
 function App() {
   const [isVisible, setIsVisible] = useState(false);
@@ -41,6 +44,21 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(true);
   const [selectedFeature, setSelectedFeature] = useState(0);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [showApp, setShowApp] = useState(false);
+  
+  // AppKit hooks
+  const { open } = useAppKit();
+  const { isConnected, address } = useAccount();
+
+  // Function to launch the VCOP app
+  const handleLaunchApp = () => {
+    setShowApp(true);
+  };
+
+  // Function to return to landing page
+  const handleBackToLanding = () => {
+    setShowApp(false);
+  };
 
   const stats = [
     { value: "2,600", label: "COP per USD (2014)", color: "text-green-400" },
@@ -192,6 +210,11 @@ function App() {
     }
   ];
 
+  // If showing the app, render the LoanApp component
+  if (showApp) {
+    return <LoanApp />;
+  }
+
   return (
     <div className="min-h-screen bg-white" style={{ zoom: '0.9' }}>
       {/* Navigation Bar */}
@@ -226,14 +249,22 @@ function App() {
                 Documentation
               </a>
               <a href="#" className="text-white/80 hover:text-white transition-colors">FAQ</a>
-              <a 
-                href="https://vcop-lime.vercel.app/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                Launch App
-              </a>
+              {!isConnected ? (
+                <button 
+                  onClick={() => open()}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <Wallet className="w-4 h-4" />
+                  Connect Wallet
+                </button>
+              ) : (
+                <button 
+                  onClick={handleLaunchApp}
+                  className="bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  Launch App
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -374,21 +405,35 @@ function App() {
 
               {/* CTA Buttons - Stack on Mobile, Inline on Desktop */}
               <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center items-center max-w-lg mx-auto">
-                <a 
-                  href="https://vcop-lime.vercel.app/" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="group bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-2xl flex items-center gap-2 relative overflow-hidden w-full sm:w-auto justify-center
-                    py-3 px-6 text-base
-                    md:py-4 md:px-8 md:text-lg"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-teal-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <div className="relative flex items-center gap-2">
-                    <Zap className="w-4 h-4 md:w-5 md:h-5" />
-                    Launch App
-                    <ArrowRight className="w-4 h-4 md:w-5 md:h-5 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </a>
+                {!isConnected ? (
+                  <button 
+                    onClick={() => open()}
+                    className="group bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-2xl flex items-center gap-2 relative overflow-hidden w-full sm:w-auto justify-center
+                      py-3 px-6 text-base
+                      md:py-4 md:px-8 md:text-lg"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <div className="relative flex items-center gap-2">
+                      <Wallet className="w-4 h-4 md:w-5 md:h-5" />
+                      Connect Wallet
+                      <ArrowRight className="w-4 h-4 md:w-5 md:h-5 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </button>
+                ) : (
+                  <button 
+                    onClick={handleLaunchApp}
+                    className="group bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-2xl flex items-center gap-2 relative overflow-hidden w-full sm:w-auto justify-center
+                      py-3 px-6 text-base
+                      md:py-4 md:px-8 md:text-lg"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-teal-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <div className="relative flex items-center gap-2">
+                      <Zap className="w-4 h-4 md:w-5 md:h-5" />
+                      Launch App
+                      <ArrowRight className="w-4 h-4 md:w-5 md:h-5 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </button>
+                )}
                 <a 
                   href="https://saritus-organization.gitbook.io/docs-vcop-protocol" 
                   target="_blank" 
@@ -739,19 +784,31 @@ function App() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-            <a 
-              href="https://vcop-lime.vercel.app/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="group bg-white hover:bg-gray-100 text-emerald-600 font-bold py-4 px-8 rounded-full text-lg transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-2 relative overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-50 to-teal-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              <div className="relative flex items-center gap-2">
-                <Zap className="w-5 h-5" />
-                Try VCOP App
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </a>
+{!isConnected ? (
+              <button 
+                onClick={() => open()}
+                className="group bg-white hover:bg-gray-100 text-blue-600 font-bold py-4 px-8 rounded-full text-lg transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-2 relative overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-50 to-indigo-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="relative flex items-center gap-2">
+                  <Wallet className="w-5 h-5" />
+                  Connect Wallet
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </button>
+            ) : (
+              <button 
+                onClick={handleLaunchApp}
+                className="group bg-white hover:bg-gray-100 text-emerald-600 font-bold py-4 px-8 rounded-full text-lg transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-2 relative overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-emerald-50 to-teal-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="relative flex items-center gap-2">
+                  <Zap className="w-5 h-5" />
+                  Try VCOP App
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </button>
+            )}
             <a 
               href="https://saritus-organization.gitbook.io/docs-vcop-protocol" 
               target="_blank" 
