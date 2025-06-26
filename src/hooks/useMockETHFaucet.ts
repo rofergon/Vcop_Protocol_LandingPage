@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useBalance } from 'wagmi';
 import { parseUnits } from 'viem';
-import { BASE_SEPOLIA_ADDRESSES } from './useCreatePosition';
+import useContractAddresses from './useContractAddresses';
 import MockETHABI from '../Abis/MockETH.json';
 
 export interface FaucetState {
@@ -14,6 +14,7 @@ export interface FaucetState {
 
 export function useMockETHFaucet() {
   const { address, isConnected } = useAccount();
+  const { addresses, isReady } = useContractAddresses();
   
   const [state, setState] = useState<FaucetState>({
     isLoading: false,
@@ -26,8 +27,8 @@ export function useMockETHFaucet() {
   // Balance del usuario para MockETH
   const { data: ethBalance, refetch: refetchBalance } = useBalance({
     address,
-    token: BASE_SEPOLIA_ADDRESSES.mockETH,
-    query: { enabled: !!address }
+    token: addresses?.mockETH,
+    query: { enabled: !!address && !!addresses?.mockETH }
   });
 
   const {
@@ -53,6 +54,11 @@ export function useMockETHFaucet() {
       return;
     }
 
+    if (!isReady || !addresses?.mockETH) {
+      setState(prev => ({ ...prev, error: 'Contract addresses are still loading. Please wait a moment and try again.' }));
+      return;
+    }
+
     try {
       setState(prev => ({ 
         ...prev, 
@@ -62,8 +68,10 @@ export function useMockETHFaucet() {
         isConfirming: false
       }));
 
+      console.log('🚀 Minting ETH using address:', addresses.mockETH);
+
       await mintETH({
-        address: BASE_SEPOLIA_ADDRESSES.mockETH,
+        address: addresses.mockETH,
         abi: MockETHABI,
         functionName: 'mint',
         args: [address, parseUnits('1', 18)] // Mintear exactamente 1 ETH
@@ -80,7 +88,7 @@ export function useMockETHFaucet() {
         error: error instanceof Error ? error.message : 'Failed to request ETH'
       }));
     }
-  }, [isConnected, address, mintETH]);
+  }, [isConnected, address, mintETH, addresses, isReady]);
 
   // Función para resetear el estado
   const resetFaucet = useCallback(() => {
@@ -149,7 +157,7 @@ export function useMockETHFaucet() {
     } : null,
     
     // Status helpers
-    canRequest: isConnected && !state.isLoading,
+    canRequest: isConnected && !state.isLoading && isReady && !!addresses?.mockETH,
     hasError: !!state.error,
     hasSuccess: state.success,
     

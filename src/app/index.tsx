@@ -18,12 +18,14 @@ import {
   CheckCircle,
   Clock,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  ArrowDownToLine
 } from 'lucide-react';
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { useAppKit } from '@reown/appkit/react';
-import { useCreatePosition, BASE_SEPOLIA_ADDRESSES } from '../hooks/useCreatePosition';
+import { useCreatePosition } from '../hooks/useCreatePosition';
 import type { LoanTerms } from '../hooks/useCreatePosition';
+import useContractAddresses from '../hooks/useContractAddresses';
 import { parseUnits, formatUnits } from 'viem';
 import MockETHFaucet from './components/MockETHFaucet';
 import { useUserPositions } from '../hooks/useUserPositions';
@@ -236,6 +238,9 @@ const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnected }) 
   const [easyCollateralAmount, setEasyCollateralAmount] = React.useState(1);
   const [easyLTV, setEasyLTV] = React.useState(60);
 
+  // Hook centralizado de direcciones
+  const { addresses, isReady: addressesReady, getAssetSymbol } = useContractAddresses();
+
   // Hook para crear posiciones
   const {
     createPosition,
@@ -251,7 +256,6 @@ const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnected }) 
     isCreateLoanPending,
     refetchBalances
   } = useCreatePosition({
-    addresses: BASE_SEPOLIA_ADDRESSES,
     autoVerifyBalances: true
   });
 
@@ -278,9 +282,14 @@ const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnected }) 
         6
       );
       
+      if (!addresses?.mockETH || !addresses?.mockUSDC) {
+        console.error('Contract addresses not loaded yet');
+        return;
+      }
+
       const customTerms: Partial<LoanTerms> = {
-        collateralAsset: BASE_SEPOLIA_ADDRESSES.mockETH,
-        loanAsset: BASE_SEPOLIA_ADDRESSES.mockUSDC,
+        collateralAsset: addresses.mockETH,
+        loanAsset: addresses.mockUSDC,
         collateralAmount: collateralAmountBigInt,
         loanAmount: loanAmountBigInt,
         maxLoanToValue: BigInt((isEasyMode ? easyLTV : currentLTV) * 10000), // Convert to basis points
@@ -781,47 +790,17 @@ const MyPositionsTab: React.FC = () => {
     repayFullPosition,
     repayPartialPosition,
     refreshPositions,
-    isRepaying
+    isRepaying,
+    isApproving,
+    txError
   } = useUserPositions();
 
-  // Asset symbol helper - Declarar ANTES de usar en logs
+  // Hook centralizado de direcciones
+  const { getAssetSymbol: getAssetSymbolFromHook } = useContractAddresses();
+
+  // Asset symbol helper - Ahora usa el hook centralizado
   const getAssetSymbol = (assetAddress: string): string => {
-    // Mapeo de direcciones exactas (desde deployed-addresses-mock.json)
-    const assetMap: Record<string, string> = {
-      // ETH variants (todas las posibles formas de escribir la dirección)
-      '0xde3fd80e2bccC96f5fb43ac7481036db9998f521': 'ETH',   // mockETH - lowercase
-      '0xDe3fd80E2bcCc96f5FB43ac7481036Db9998f521': 'ETH',   // mockETH - original case
-      
-      // USDC variants
-      '0x45bda644dd25600b7d6df4ec87e9710ad1dae9d9': 'USDC',  // mockUSDC - lowercase
-      '0x45BdA644DD25600b7d6DF4EC87E9710AD1DAE9d9': 'USDC',  // mockUSDC - original case
-      
-      // WBTC variants
-      '0x03f43ce344d9988138b4807a7392a9fedea83aa1': 'WBTC',  // mockWBTC - lowercase
-      '0x03f43Ce344D9988138b4807a7392A9feDea83AA1': 'WBTC',  // mockWBTC - original case
-      
-      // VCOP variants
-      '0x32224a6edf252c711b24f61403be011e6a7bEaEf': 'VCOP',  // vcopToken - lowercase
-      '0x32224a6edf252c711B24f61403be011e6A7BEaEf': 'VCOP'   // vcopToken - original case
-    }
-    
-    const normalizedAddress = assetAddress.toLowerCase()
-    let symbol = assetMap[normalizedAddress]
-    
-    // Si no se encuentra con la dirección normalizada, intenta con la dirección original
-    if (!symbol) {
-      symbol = assetMap[assetAddress]
-    }
-    
-    if (!symbol) {
-      // Fallback para assets no reconocidos
-      if (normalizedAddress.includes('de3fd80e2bccc96f5fb43ac7481036db9998f521')) return 'ETH'
-      if (normalizedAddress.includes('45bda644dd25600b7d6df4ec87e9710ad1dae9d9')) return 'USDC'
-      if (normalizedAddress.includes('03f43ce344d9988138b4807a7392a9fedea83aa1')) return 'WBTC'
-      if (normalizedAddress.includes('32224a6edf252c711b24f61403be011e6a7beaef')) return 'VCOP'
-    }
-    
-    return symbol || 'Unknown'
+    return getAssetSymbolFromHook(assetAddress)
   };
 
 
@@ -870,13 +849,13 @@ const MyPositionsTab: React.FC = () => {
     );
   }
 
-  if (error) {
+  if (error || txError) {
     return (
       <div className="p-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
           <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-red-900 mb-2">Error Loading Positions</h3>
-          <p className="text-red-700 mb-4">{error}</p>
+          <p className="text-red-700 mb-4">{error || (txError instanceof Error ? txError.message : String(txError))}</p>
           <button 
             onClick={refreshPositions}
             className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold"
@@ -935,13 +914,48 @@ const MyPositionsTab: React.FC = () => {
         </div>
       </div>
 
+      {/* Transaction Status Banner */}
+      {(isApproving || isRepaying) && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+            <div>
+              <h3 className="font-semibold text-blue-900">
+                {isApproving ? '🔄 Step 1-2: Approving Tokens...' : '🚀 Step 2-2: Executing Repayment...'}
+              </h3>
+              <p className="text-blue-700 text-sm">
+                {isApproving 
+                  ? 'Please sign the approval transaction(s) in your wallet. You may need to sign 2 approvals.' 
+                  : 'Please sign the repayment transaction in your wallet.'
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Info Banner */}
+      {positions.length > 0 && (
+        <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+          <h3 className="font-semibold text-emerald-900 mb-2 flex items-center gap-2">
+            ℹ️ Repayment Process
+          </h3>
+          <p className="text-emerald-700 text-sm mb-2">
+            <strong>Two-Step Process:</strong> First repay your loan, then withdraw your collateral.
+          </p>
+          <ul className="text-emerald-700 text-sm space-y-1">
+            <li>• <strong>Step 1:</strong> Repay your loan using the "Repay Loan" button</li>
+            <li>• <strong>Step 2:</strong> After successful repayment, use "Withdraw Collateral" to recover your assets</li>
+            <li>• <strong>Safety:</strong> All transactions are simulated before execution</li>
+          </ul>
+        </div>
+      )}
+
       {/* Positions Grid */}
-      <div className="grid gap-6">
+      <div className="space-y-6">
         {positions.map((positionData) => (
-          <div 
-            key={positionData.positionId.toString()} 
-            className={`bg-white rounded-xl shadow-lg border-2 p-6 ${getRiskBgColor(positionData.collateralizationRatio)}`}
-          >
+          <div key={positionData.positionId.toString()} 
+               className="bg-white rounded-xl border border-gray-200 p-4">
             {/* Position Header */}
             <div className="flex justify-between items-start mb-4">
               <div>
@@ -1020,49 +1034,106 @@ const MyPositionsTab: React.FC = () => {
             <div className="flex gap-3">
               <button
                 onClick={async () => {
-                  const result = await repayFullPosition(positionData.positionId, positionData.position.loanAsset);
-                  if (result.success) {
-                    console.log('Position repaid successfully:', result.txHash);
-                    refreshPositions();
-                  } else {
-                    console.error('Repayment failed:', result.error);
+                  try {
+                    console.log('🔄 Starting full repayment for position:', positionData.positionId.toString());
+                    const result = await repayFullPosition(positionData.positionId, positionData.position.loanAsset);
+                    if (result.success) {
+                      console.log('✅ Position repaid successfully:', result.txHash);
+                      if (result.message) {
+                        alert(result.message);
+                      } else {
+                        alert('✅ Loan repaid successfully! You can now withdraw your collateral.');
+                      }
+                      refreshPositions();
+                    } else {
+                      console.error('❌ Repayment failed:', result.error);
+                      if (result.error?.includes('already been repaid')) {
+                        alert('ℹ️ This loan has already been repaid. You can now withdraw your collateral.');
+                      } else if (result.error?.includes('cancelled')) {
+                        alert('❌ Transaction was cancelled by user.');
+                      } else if (result.error?.includes('insufficient')) {
+                        alert('❌ Insufficient USDC balance. Please get more USDC tokens first.');
+                      } else {
+                        alert(`❌ Repayment failed: ${result.error}`);
+                      }
+                    }
+                  } catch (error) {
+                    console.error('❌ Unexpected error:', error);
+                    alert('❌ An unexpected error occurred. Please try again.');
                   }
                 }}
-                disabled={isRepaying}
-                className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                disabled={isApproving || isRepaying}
+                className={`flex-1 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 ${
+                  isApproving || isRepaying 
+                    ? 'bg-gray-400'
+                    : (Number(positionData.debtValueFormatted) === 0 || parseFloat(positionData.debtValueFormatted) === 0)
+                      ? 'bg-blue-500 hover:bg-blue-600' 
+                      : 'bg-emerald-500 hover:bg-emerald-600'
+                }`}
               >
-                {isRepaying ? (
+                {(isApproving || isRepaying) ? (
                   <>
                     <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                    Repaying...
+                    {isApproving ? 'Approving...' : 'Repaying...'}
                   </>
                 ) : (
                   <>
-                    <DollarSign className="w-4 h-4" />
-                    Repay Full
+                    {(Number(positionData.debtValueFormatted) === 0 || parseFloat(positionData.debtValueFormatted) === 0) ? (
+                      <>
+                        <ArrowDownToLine className="w-4 h-4" />
+                        Withdraw Collateral
+                      </>
+                    ) : (
+                      <>
+                        <DollarSign className="w-4 h-4" />
+                        Repay Loan
+                      </>
+                    )}
                   </>
                 )}
               </button>
               
-              <button
-                onClick={async () => {
-                  const amount = prompt("Enter amount to repay:");
-                  if (amount && !isNaN(Number(amount))) {
-                    const result = await repayPartialPosition(positionData.positionId, positionData.position.loanAsset, BigInt(Math.floor(Number(amount) * 1e6)));
-                    if (result.success) {
-                      console.log('Partial repayment successful:', result.txHash);
-                      refreshPositions();
-                    } else {
-                      console.error('Repayment failed:', result.error);
+              {Number(positionData.debtValueFormatted) > 0 && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const amount = prompt("Enter amount to repay (USDC):");
+                      if (amount && !isNaN(Number(amount)) && Number(amount) > 0) {
+                        console.log('🔄 Starting partial repayment for position:', positionData.positionId.toString(), 'amount:', amount);
+                        const result = await repayPartialPosition(
+                          positionData.positionId, 
+                          positionData.position.loanAsset, 
+                          BigInt(Math.floor(Number(amount) * 1e6))
+                        );
+                        if (result.success) {
+                          console.log('✅ Partial repayment successful:', result.txHash);
+                          alert(`✅ Successfully repaid ${amount} USDC!`);
+                          refreshPositions();
+                        } else {
+                          console.error('❌ Partial repayment failed:', result.error);
+                          if (result.error?.includes('cancelled')) {
+                            alert('❌ Transaction was cancelled by user.');
+                          } else if (result.error?.includes('insufficient')) {
+                            alert('❌ Insufficient USDC balance. Please get more USDC tokens first.');
+                          } else {
+                            alert(`❌ Partial repayment failed: ${result.error}`);
+                          }
+                        }
+                      } else if (amount !== null) {
+                        alert('❌ Please enter a valid amount greater than 0.');
+                      }
+                    } catch (error) {
+                      console.error('❌ Unexpected error:', error);
+                      alert('❌ An unexpected error occurred. Please try again.');
                     }
-                  }
-                }}
-                disabled={isRepaying}
-                className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
-              >
-                <DollarSign className="w-4 h-4" />
-                Partial Repay
-              </button>
+                  }}
+                  disabled={isApproving || isRepaying}
+                  className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                >
+                  <DollarSign className="w-4 h-4" />
+                  Partial Repay
+                </button>
+              )}
               
               <button
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"

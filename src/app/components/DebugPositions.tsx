@@ -1,168 +1,180 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { useUserPositions, getAssetSymbol } from '../../hooks/useUserPositions';
-import { formatUnits } from 'viem';
+import { useRepayPosition, type RepaymentResult } from '../../hooks/hook_repayposition';
+import { formatUnits, parseUnits, type Address, hexToBigInt } from 'viem';
+
+interface Position {
+  positionId: bigint;
+  totalDebt: `0x${string}` | bigint;
+  collateralValueFormatted: string;
+  debtValueFormatted: string;
+  healthFactor: string;
+  position: {
+    collateralAsset: Address;
+  };
+}
+
+interface ContractAddresses {
+  mockUSDC: Address;
+  [key: string]: Address;
+}
 
 export const DebugPositions: React.FC = () => {
   const { address, isConnected } = useAccount();
   const { 
     positions, 
     contractAddresses,
-    isLoading, 
-    error,
-    repayFullPosition,
-    repayPartialPosition,
-    isApproving,
-    isRepaying
+    isLoading: isLoadingPositions, 
+    error: positionsError,
+    refreshPositions
   } = useUserPositions();
+
+  const {
+    repayPosition,
+    loadVaultHandler,
+    isLoading: isRepaying,
+    error: repayError,
+    isApproving,
+    isConfirmingApprove,
+    isConfirmingRepay,
+    approveHash,
+    repayHash
+  } = useRepayPosition();
+
+  const [selectedAmount, setSelectedAmount] = useState<string>('');
+
+  // Cargar VaultHandler al inicio
+  useEffect(() => {
+    loadVaultHandler();
+  }, [loadVaultHandler]);
 
   console.log('🔧 Debug Positions Render:');
   console.log('- Is Connected:', isConnected);
   console.log('- Address:', address);
   console.log('- Contract Addresses:', contractAddresses);
-  console.log('- Is Loading:', isLoading);
-  console.log('- Error:', error);
+  console.log('- Is Loading:', isLoadingPositions);
+  console.log('- Error:', positionsError || repayError);
   console.log('- Positions:', positions);
 
-  if (isLoading) return <div>Loading positions...</div>;
-  if (error) return <div className="text-red-500">Error: {error}</div>;
+  if (isLoadingPositions) return <div>Loading positions...</div>;
+  if (positionsError) return <div className="text-red-500">Error: {positionsError}</div>;
   if (!contractAddresses) return <div>Loading contract addresses...</div>;
 
-  const handleRepayFull = async (positionId: bigint) => {
+  const handleRepayFull = async (position: Position) => {
     if (!contractAddresses?.mockUSDC) return;
     
-    console.log('🎯 Initiating full repayment for position:', positionId.toString());
-    const result = await repayFullPosition(positionId, contractAddresses.mockUSDC);
-    console.log('🎯 Repayment result:', result);
+    console.log('🎯 Initiating full repayment for position:', position.positionId.toString());
+    
+    // Convertir totalDebt a bigint si es necesario
+    const totalDebtBigInt = typeof position.totalDebt === 'string' 
+      ? hexToBigInt(position.totalDebt)
+      : position.totalDebt;
+    
+    const result = await repayPosition(
+      contractAddresses.mockUSDC as Address,
+      totalDebtBigInt
+    );
+    
+    if (result.success) {
+      console.log('✅ Repayment successful! Hash:', result.txHash);
+      refreshPositions();
+    } else {
+      console.error('❌ Repayment failed:', result.error);
+    }
   };
 
-  const handleRepayPartial = async (positionId: bigint, amount: string) => {
-    if (!contractAddresses?.mockUSDC) return;
+  const handleRepayPartial = async (position: Position) => {
+    if (!contractAddresses?.mockUSDC || !selectedAmount) return;
     
-    const amountBigInt = BigInt(Math.floor(parseFloat(amount) * 1000000)); // Convert to 6 decimals
-    console.log('🎯 Initiating partial repayment for position:', positionId.toString(), 'amount:', amount, 'USDC');
-    const result = await repayPartialPosition(positionId, contractAddresses.mockUSDC, amountBigInt);
-    console.log('🎯 Partial repayment result:', result);
+    try {
+      const amountBigInt = parseUnits(selectedAmount, 6); // USDC has 6 decimals
+      
+      console.log('🎯 Initiating partial repayment:');
+      console.log('- Position:', position.positionId.toString());
+      console.log('- Amount:', selectedAmount, 'USDC');
+      
+      const result = await repayPosition(
+        contractAddresses.mockUSDC as Address,
+        amountBigInt
+      );
+      
+      if (result.success) {
+        console.log('✅ Partial repayment successful! Hash:', result.txHash);
+        setSelectedAmount('');
+        refreshPositions();
+      } else {
+        console.error('❌ Partial repayment failed:', result.error);
+      }
+    } catch (error) {
+      console.error('Error parsing amount:', error);
+    }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold mb-4">🔍 Debug: User Positions</h2>
+    <div className="p-4">
+      <h2 className="text-xl font-bold mb-4">Debug Positions</h2>
       
-      {/* Contract Addresses */}
-      <div className="mb-6 p-4 bg-gray-100 rounded">
-        <h3 className="font-semibold mb-2">📋 Contract Addresses:</h3>
-        <div className="text-sm space-y-1">
-          <div><strong>FlexibleLoanManager:</strong> {contractAddresses.flexibleLoanManager}</div>
-          <div><strong>MockUSDC:</strong> {contractAddresses.mockUSDC}</div>
-          <div><strong>MockETH:</strong> {contractAddresses.mockETH}</div>
-        </div>
-      </div>
-
-      {/* Transaction Status */}
-      {(isApproving || isRepaying) && (
-        <div className="mb-6 p-4 bg-blue-100 rounded">
-          <h3 className="font-semibold mb-2">⏳ Transaction Status:</h3>
-          {isApproving && <div className="text-blue-600">🔄 Approving tokens...</div>}
-          {isRepaying && <div className="text-blue-600">🚀 Executing repayment...</div>}
+      {repayError && (
+        <div className="text-red-500 mb-4">
+          Error: {repayError}
         </div>
       )}
 
-      {/* Positions */}
       <div className="space-y-4">
-        {positions.length === 0 ? (
-          <div className="text-gray-500">No positions found</div>
-        ) : (
-          positions.map((position) => {
-            // Calculate repayment details for debugging
-            const totalDebt = position.totalDebt;
-            const accruedInterest = position.accruedInterest;
-            const protocolFee = 5000n; // 0.5%
-            const interestFee = (accruedInterest * protocolFee) / 1000000n;
-            const actualTransferAmount = totalDebt + interestFee;
-            const approvalAmount = actualTransferAmount + (actualTransferAmount * 10n) / 100n;
+        {positions.map((position: Position) => (
+          <div key={position.positionId.toString()} 
+               className="border p-4 rounded-lg">
+            <h3 className="font-semibold">
+              Position #{position.positionId.toString()}
+            </h3>
+            
+            <div className="mt-2 space-y-1 text-sm">
+              <p>Collateral: {position.collateralValueFormatted} {getAssetSymbol(position.position.collateralAsset)}</p>
+              <p>Debt: {position.debtValueFormatted} USDC</p>
+              <p>Health Factor: {position.healthFactor}</p>
+            </div>
 
-            return (
-              <div key={position.positionId.toString()} className="border rounded-lg p-4">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold">Position #{position.positionId.toString()}</h3>
-                    <div className="text-sm text-gray-600">
-                      Health Factor: {position.healthFactor}
-                    </div>
-                  </div>
-                  <div className={`px-2 py-1 rounded text-sm ${
-                    position.isAtRisk ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                  }`}>
-                    {position.isAtRisk ? '⚠️ At Risk' : '✅ Safe'}
-                  </div>
-                </div>
+            <div className="mt-4 flex items-center gap-4">
+              <button
+                onClick={() => handleRepayFull(position)}
+                disabled={isRepaying || isApproving}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+              >
+                {isRepaying ? 'Repaying...' : 'Repay Full'}
+              </button>
 
-                {/* Position Details */}
-                <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                  <div>
-                    <div><strong>Collateral:</strong> {position.collateralValueFormatted} ETH</div>
-                    <div><strong>Debt:</strong> {position.debtValueFormatted} USDC</div>
-                  </div>
-                  <div>
-                    <div><strong>Principal:</strong> {formatUnits(position.position.loanAmount, 6)} USDC</div>
-                    <div><strong>Interest:</strong> {formatUnits(accruedInterest, 6)} USDC</div>
-                  </div>
-                </div>
-
-                {/* Repayment Calculation Debug */}
-                <div className="bg-yellow-50 p-3 rounded mb-4">
-                  <h4 className="font-semibold text-sm mb-2">🧮 Repayment Calculation:</h4>
-                  <div className="text-xs space-y-1">
-                    <div><strong>Total Debt:</strong> {formatUnits(totalDebt, 6)} USDC</div>
-                    <div><strong>Interest Fee (0.5%):</strong> {formatUnits(interestFee, 6)} USDC</div>
-                    <div><strong>Actual Transfer:</strong> {formatUnits(actualTransferAmount, 6)} USDC</div>
-                    <div><strong>Approval Amount (+10%):</strong> {formatUnits(approvalAmount, 6)} USDC</div>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleRepayFull(position.positionId)}
-                    disabled={isApproving || isRepaying}
-                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 text-sm"
-                  >
-                    💰 Repay Full
-                  </button>
-                  
-                  <button
-                    onClick={() => handleRepayPartial(position.positionId, "500")}
-                    disabled={isApproving || isRepaying}
-                    className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400 text-sm"
-                  >
-                    🔄 Repay 500 USDC
-                  </button>
-                  
-                  <button
-                    onClick={() => handleRepayPartial(position.positionId, "1000")}
-                    disabled={isApproving || isRepaying}
-                    className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 disabled:bg-gray-400 text-sm"
-                  >
-                    🔄 Repay 1000 USDC
-                  </button>
-                </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={selectedAmount}
+                  onChange={(e) => setSelectedAmount(e.target.value)}
+                  placeholder="Amount in USDC"
+                  className="px-2 py-1 border rounded"
+                />
+                <button
+                  onClick={() => handleRepayPartial(position)}
+                  disabled={isRepaying || isApproving || !selectedAmount}
+                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+                >
+                  {isRepaying ? 'Repaying...' : 'Repay Partial'}
+                </button>
               </div>
-            );
-          })
-        )}
-      </div>
+            </div>
 
-      {/* Debug Information */}
-      <div className="mt-6 p-4 bg-gray-50 rounded">
-        <h3 className="font-semibold mb-2">🔧 Debug Info:</h3>
-        <div className="text-xs space-y-1">
-          <div><strong>Positions loaded:</strong> {positions.length}</div>
-          <div><strong>Loading:</strong> {isLoading ? 'Yes' : 'No'}</div>
-          <div><strong>Error:</strong> {error || 'None'}</div>
-          <div><strong>Approving:</strong> {isApproving ? 'Yes' : 'No'}</div>
-          <div><strong>Repaying:</strong> {isRepaying ? 'Yes' : 'No'}</div>
-        </div>
+            {(isApproving || isConfirmingApprove) && (
+              <p className="mt-2 text-sm text-blue-500">
+                {approveHash ? 'Confirming approval...' : 'Approving tokens...'}
+              </p>
+            )}
+            
+            {(isRepaying || isConfirmingRepay) && (
+              <p className="mt-2 text-sm text-green-500">
+                {repayHash ? 'Confirming repayment...' : 'Processing repayment...'}
+              </p>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

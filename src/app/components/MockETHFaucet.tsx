@@ -1,6 +1,7 @@
 import React from 'react';
-import { Droplets, CheckCircle, AlertTriangle, Loader2, TrendingUp } from 'lucide-react';
+import { Droplets, CheckCircle, AlertTriangle, Loader2, TrendingUp, Clock } from 'lucide-react';
 import { useMockETHFaucet } from '../../hooks/useMockETHFaucet';
+import useContractAddresses from '../../hooks/useContractAddresses';
 
 const MockETHFaucet: React.FC = () => {
   const {
@@ -17,6 +18,8 @@ const MockETHFaucet: React.FC = () => {
     hasError,
     hasSuccess
   } = useMockETHFaucet();
+  
+  const { isReady: addressesReady } = useContractAddresses();
 
   return (
     <div className="bg-gradient-to-r from-blue-50 to-emerald-50 border border-blue-200 rounded-lg p-3">
@@ -28,6 +31,11 @@ const MockETHFaucet: React.FC = () => {
         
         {!isConnected ? (
           <span className="text-xs text-gray-500">Connect wallet</span>
+        ) : !addressesReady ? (
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3 text-amber-500 animate-pulse" />
+            <span className="text-xs text-amber-600">Loading...</span>
+          </div>
         ) : hasSuccess ? (
           <div className="flex items-center gap-2">
             <CheckCircle className="w-4 h-4 text-green-600" />

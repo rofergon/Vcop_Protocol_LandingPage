@@ -148,6 +148,7 @@ export interface RepaymentResult {
   success: boolean
   txHash?: Hash
   error?: string
+  message?: string
 }
 
 // Permit2 Types
@@ -518,52 +519,99 @@ export function useUserPositions() {
   }, [refetchPositionIds, refetchPositionData])
 
   /**
+   * Detecta qué asset handler maneja un token específico
+   */
+  const detectAssetHandler = useCallback(async (tokenAddress: Address): Promise<Address | null> => {
+    if (!contractAddresses) return null
+
+    try {
+      const handlers = [
+        contractAddresses.vaultBasedHandler,
+        // Agregar otros handlers aquí cuando estén disponibles
+      ]
+
+      for (const handlerAddress of handlers) {
+        if (!handlerAddress) continue
+        
+        try {
+          const isSupported = await publicClient?.readContract({
+            address: handlerAddress,
+            abi: VAULT_BASED_HANDLER_ABI as any,
+            functionName: 'isAssetSupported',
+            args: [tokenAddress]
+          })
+          
+          if (isSupported) {
+            console.log(`🎯 Token ${tokenAddress} is handled by:`, handlerAddress)
+            return handlerAddress
+          }
+        } catch (error) {
+          console.log(`Handler ${handlerAddress} check failed:`, error)
+          continue
+        }
+      }
+
+      return null
+    } catch (error) {
+      console.error('Error detecting asset handler:', error)
+      return null
+    }
+  }, [contractAddresses, publicClient])
+
+  /**
    * Repagar completamente una posición con UX optimizada (menos clicks)
    */
   const repayFullPosition = useCallback(async (
     positionId: bigint,
     loanAssetAddress: Address
   ): Promise<RepaymentResult> => {
-    if (!contractAddresses?.flexibleLoanManager || !contractAddresses?.vaultBasedHandler || !address) {
+    if (!contractAddresses?.flexibleLoanManager || !address) {
       return { success: false, error: 'Contract addresses not loaded or wallet not connected' }
-    }
-
-    // Encontrar la posición para obtener la deuda total
-    const positionData = positionsData.find(p => p.positionId === positionId)
-    if (!positionData) {
-      return { success: false, error: 'Position not found' }
     }
 
     try {
       setError(null)
       resetTx()
       
-      const totalDebt = positionData.totalDebt
-      const accruedInterest = positionData.accruedInterest
-      
-      // 🎯 OPTIMIZACIÓN: Usar un monto generoso para evitar problemas de precisión
-      // El contrato automáticamente usará solo lo que necesita
-      const repayAmount = totalDebt
-      const interestPayment = repayAmount > accruedInterest ? accruedInterest : repayAmount
-      const principalPayment = repayAmount - interestPayment
-      const protocolFee = 5000n // 0.5%
-      const interestFee = (interestPayment * protocolFee) / 1000000n
-      
-      // 🚀 CLAVE: Usar monto generoso para asegurar que cubra todo
-      // Incluir buffer del 50% para cubrir cualquier variación en cálculos
-      const totalNeedAmount = interestFee + principalPayment
-      const generousAmount = totalNeedAmount + (totalNeedAmount * 50n) / 100n // 50% buffer
+      // 1. Get position data and verify it exists
+      const positionData = positionsData.find(p => p.positionId === positionId)
+      if (!positionData) {
+        return { success: false, error: 'Position not found' }
+      }
 
-      console.log('🔄 Starting optimized repayment (reduced clicks)...')
+      // Check if position is still active
+      if (!positionData.position.isActive) {
+        // If position is inactive, it means it's already repaid and ready for collateral withdrawal
+        return { 
+          success: false, 
+          error: 'This position has already been repaid. You can now withdraw your collateral using the "Withdraw Collateral" button.' 
+        }
+      }
+
+      const { totalDebt, accruedInterest, position } = positionData
+      
+      console.log('🔄 Starting CORRECT repayment flow according to FlexibleLoanManager.sol...')
       console.log('💰 Total debt:', formatUnits(totalDebt, 6), 'USDC')
-      console.log('💸 Interest fee:', formatUnits(interestFee, 6), 'USDC')
-      console.log('💸 Principal payment:', formatUnits(principalPayment, 6), 'USDC')
-      console.log('✅ Generous approval amount:', formatUnits(generousAmount, 6), 'USDC')
+      console.log('💸 Accrued interest:', formatUnits(accruedInterest, 6), 'USDC')
 
-      setTransactionStep('approving')
+      // 2. Detect asset handler for loan token
+      const assetHandler = await detectAssetHandler(loanAssetAddress)
+      if (!assetHandler) {
+        throw new Error('No asset handler found for loan token')
+      }
+      console.log('✅ Asset handler detected:', assetHandler)
 
-      // 🎯 OPTIMIZACIÓN 1: Verificar allowances actuales primero
-      const [flexibleAllowance, vaultAllowance] = await Promise.all([
+      // 3. Calculate payment breakdown
+      const protocolFee = 5000n // 0.5%
+      const interestFee = (accruedInterest * protocolFee) / 1000000n
+      const principalPayment = position.loanAmount
+
+      console.log('📊 Payment breakdown:')
+      console.log('  Interest fee (to FlexibleLoanManager):', formatUnits(interestFee, 6), 'USDC')
+      console.log('  Principal (to AssetHandler):', formatUnits(principalPayment, 6), 'USDC')
+
+      // 4. Check allowances
+      const [loanManagerAllowance, assetHandlerAllowance] = await Promise.all([
         publicClient?.readContract({
           address: loanAssetAddress,
           abi: ERC20_ABI,
@@ -574,140 +622,168 @@ export function useUserPositions() {
           address: loanAssetAddress,
           abi: ERC20_ABI,
           functionName: 'allowance',
-          args: [address, contractAddresses.vaultBasedHandler]
+          args: [address, assetHandler]
         }) as Promise<bigint>
       ])
 
       console.log('🔍 Current allowances:')
-      console.log('  FlexibleLoanManager:', formatUnits(flexibleAllowance || 0n, 6), 'USDC')
-      console.log('  VaultBasedHandler:', formatUnits(vaultAllowance || 0n, 6), 'USDC')
+      console.log('  FlexibleLoanManager:', formatUnits(loanManagerAllowance, 6), 'USDC')
+      console.log('  AssetHandler:', formatUnits(assetHandlerAllowance, 6), 'USDC')
 
-      // 🎯 OPTIMIZACIÓN 2: Solo aprobar si es necesario
+      // 5. Approve if needed (with 10% buffer)
       const approvalPromises = []
       let approvalsNeeded = 0
-      
-      if (!flexibleAllowance || flexibleAllowance < generousAmount) {
-        console.log('🔄 Will approve FlexibleLoanManager...')
+
+      const bufferMultiplier = 110n // 110% buffer
+      const safeInterestFee = (interestFee * bufferMultiplier) / 100n
+      const safePrincipalAmount = (principalPayment * bufferMultiplier) / 100n
+
+      if (!loanManagerAllowance || loanManagerAllowance < safeInterestFee) {
         approvalPromises.push(
           writeContractAsync({
             address: loanAssetAddress,
             abi: ERC20_ABI,
             functionName: 'approve',
-            args: [contractAddresses.flexibleLoanManager, generousAmount]
+            args: [contractAddresses.flexibleLoanManager, safeInterestFee]
           })
         )
         approvalsNeeded++
       }
 
-      if (!vaultAllowance || vaultAllowance < generousAmount) {
-        console.log('🔄 Will approve VaultBasedHandler...')
+      if (!assetHandlerAllowance || assetHandlerAllowance < safePrincipalAmount) {
         approvalPromises.push(
           writeContractAsync({
             address: loanAssetAddress,
             abi: ERC20_ABI,
             functionName: 'approve',
-            args: [contractAddresses.vaultBasedHandler, generousAmount]
+            args: [assetHandler, safePrincipalAmount]
           })
         )
         approvalsNeeded++
       }
 
-      // 🎯 OPTIMIZACIÓN 3: Ejecutar aprobaciones en paralelo si es necesario
       if (approvalPromises.length > 0) {
-        console.log(`🚀 Executing ${approvalPromises.length} approval(s) in parallel...`)
         console.log(`ℹ️  You will need to sign ${approvalsNeeded} approval transaction(s) + 1 repayment transaction`)
+        setTransactionStep('approving')
         
         try {
           await Promise.all(approvalPromises)
-          console.log('✅ All approvals completed!')
-          
-          // Esperar menos tiempo ya que las aprobaciones son más confiables
-          await new Promise(resolve => setTimeout(resolve, 2000))
-        } catch (approvalError: any) {
-          // 🎯 MANEJO ESPECÍFICO DE ERRORES DE APROBACIÓN
-          if (approvalError?.message?.includes('User rejected') || 
-              approvalError?.message?.includes('User denied') ||
-              approvalError?.name === 'UserRejectedRequestError') {
-            console.log('❌ User cancelled approval transaction')
+          await new Promise(resolve => setTimeout(resolve, 2000)) // Wait for approvals to propagate
+        } catch (approveError: any) {
+          if (approveError?.message?.includes('User rejected') || 
+              approveError?.message?.includes('User denied')) {
             setTransactionStep('idle')
-            return { success: false, error: 'Transaction cancelled by user' }
+            return { success: false, error: 'Approval cancelled by user' }
           }
-          throw approvalError // Re-throw si no es cancelación de usuario
+          throw approveError
         }
       } else {
         console.log('✅ Sufficient allowances already exist, skipping approvals!')
         console.log('ℹ️  You will only need to sign 1 repayment transaction')
       }
 
-      // 🎯 OPTIMIZACIÓN 4: Ejecutar repago con monto exacto de totalDebt
-      // Esto debería cerrar la posición automáticamente según el contrato
-      setTransactionStep('repaying')
-      console.log('🚀 Executing full repayment to close position...')
-      console.log('ℹ️  This transaction will automatically close your position and return collateral')
+      // 6. Check user balance before repayment
+      console.log('💰 Checking user balance before repayment...')
+      const userBalance = await publicClient?.readContract({
+        address: loanAssetAddress,
+        abi: ERC20_ABI,
+        functionName: 'balanceOf',
+        args: [address]
+      }) as bigint
 
+      console.log('💰 User balance:', formatUnits(userBalance, 6), 'USDC')
+      console.log('💸 Required:', formatUnits(totalDebt, 6), 'USDC')
+
+      if (!userBalance || userBalance < totalDebt) {
+        return { 
+          success: false, 
+          error: `Insufficient balance. Required: ${formatUnits(totalDebt, 6)} USDC, Available: ${formatUnits(userBalance, 6)} USDC` 
+        }
+      }
+
+      // 7. Simulate repayment transaction first
+      console.log('🔍 Simulating repayment transaction first...')
       try {
-        const repayHash = await writeContractAsync({
+        await publicClient?.simulateContract({
           address: contractAddresses.flexibleLoanManager,
           abi: FLEXIBLE_LOAN_MANAGER_ABI,
           functionName: 'repayLoan',
-          args: [positionId, totalDebt] // Usar totalDebt para repago completo
+          args: [positionId, totalDebt],
+          account: address
         })
-
-        console.log('🎉 Full repayment successful! Position should be closed automatically.')
-        console.log('📄 Transaction hash:', repayHash)
-        setTransactionStep('idle')
-        
-        // Refrescar datos más rápido para mostrar el cambio
-        setTimeout(() => {
-          refreshPositions()
-        }, 1500)
-        
-        return { success: true, txHash: repayHash }
-      } catch (repayError: any) {
-        // 🎯 MANEJO ESPECÍFICO DE ERRORES DE REPAGO
-        if (repayError?.message?.includes('User rejected') || 
-            repayError?.message?.includes('User denied') ||
-            repayError?.name === 'UserRejectedRequestError') {
-          console.log('❌ User cancelled repayment transaction')
-          setTransactionStep('idle')
-          return { success: false, error: 'Repayment cancelled by user' }
+      } catch (simError: any) {
+        console.error('Transaction simulation failed:', simError)
+        return {
+          success: false,
+          error: 'Transaction simulation failed - position may not be active or insufficient balance'
         }
-        throw repayError // Re-throw si no es cancelación de usuario
       }
+
+      // 8. Execute repayment
+      setTransactionStep('repaying')
+      console.log('🔄 Executing repayment...')
+
+      const repayHash = await writeContractAsync({
+        address: contractAddresses.flexibleLoanManager,
+        abi: FLEXIBLE_LOAN_MANAGER_ABI,
+        functionName: 'repayLoan',
+        args: [positionId, totalDebt]
+      })
+
+      console.log('✅ Repayment successful! Transaction:', repayHash)
+      setTransactionStep('idle')
+
+      // 9. Wait for transaction and refresh data
+      await publicClient?.waitForTransactionReceipt({ hash: repayHash })
+      
+      // 10. Refresh position data to confirm repayment
+      await refreshPositions()
+
+      // 11. Check if position is now inactive (fully repaid)
+      const updatedPosition = positionsData.find(p => p.positionId === positionId)
+      if (updatedPosition && !updatedPosition.position.isActive) {
+        return { 
+          success: true, 
+          txHash: repayHash,
+          message: '✅ Loan successfully repaid! You can now withdraw your collateral using the "Withdraw Collateral" button.'
+        }
+      }
+
+      return { success: true, txHash: repayHash }
 
     } catch (error: any) {
+      console.error('💥 Repayment error:', error)
       setTransactionStep('idle')
       
-      // 🎯 MANEJO INTELIGENTE DE ERRORES
-      let errorMessage = 'Optimized repayment failed'
-      
+      // Handle specific error cases
       if (error?.message?.includes('User rejected') || 
-          error?.message?.includes('User denied') ||
-          error?.name === 'UserRejectedRequestError') {
-        errorMessage = 'Transaction cancelled by user'
-        console.log('❌ User cancelled transaction')
-      } else if (error?.message?.includes('insufficient funds')) {
-        errorMessage = 'Insufficient USDC balance for repayment'
-        console.error('💰 Insufficient funds error:', error)
-      } else if (error?.message?.includes('execution reverted')) {
-        errorMessage = 'Transaction failed - please check your position status'
-        console.error('🔄 Transaction reverted:', error)
-      } else {
-        console.error('💥 Unexpected repayment error:', error)
-        errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+          error?.message?.includes('User denied')) {
+        return { success: false, error: 'Transaction cancelled by user' }
       }
       
-      setError(errorMessage)
-      return { success: false, error: errorMessage }
+      if (error?.message?.includes('execution reverted')) {
+        return { 
+          success: false, 
+          error: 'Transaction failed - position may be inactive or already repaid' 
+        }
+      }
+      
+      return { 
+        success: false, 
+        error: error?.message || 'Unknown error during repayment' 
+      }
     }
   }, [
-    contractAddresses,
-    address,
-    positionsData,
+    address, 
+    contractAddresses, 
+    positionsData, 
+    publicClient, 
     writeContractAsync,
-    resetTx,
     refreshPositions,
-    publicClient
+    resetTx,
+    setError,
+    setTransactionStep,
+    detectAssetHandler
   ])
 
   /**
@@ -718,7 +794,7 @@ export function useUserPositions() {
     loanAssetAddress: Address,
     amount: bigint
   ): Promise<RepaymentResult> => {
-    if (!contractAddresses?.flexibleLoanManager || !contractAddresses?.vaultBasedHandler || !address) {
+    if (!contractAddresses?.flexibleLoanManager || !address) {
       return { success: false, error: 'Contract addresses not loaded or wallet not connected' }
     }
 
@@ -734,24 +810,29 @@ export function useUserPositions() {
 
       const accruedInterest = positionData.accruedInterest
       
-      // Calcular montos para repago parcial con buffer generoso
-      const repayAmount = amount
-      const interestPayment = repayAmount > accruedInterest ? accruedInterest : repayAmount
-      const principalPayment = repayAmount - interestPayment
-      const protocolFee = 5000n // 0.5%
-      const interestFee = (interestPayment * protocolFee) / 1000000n
-      
-      const totalNeedAmount = interestFee + principalPayment
-      const generousAmount = totalNeedAmount + (totalNeedAmount * 50n) / 100n // 50% buffer
-
-      console.log('🔄 Starting optimized partial repayment...')
+      console.log('🔄 Starting CORRECT partial repayment flow...')
       console.log('💰 Repay amount:', formatUnits(amount, 6), 'USDC')
-      console.log('✅ Generous approval amount:', formatUnits(generousAmount, 6), 'USDC')
 
       setTransactionStep('approving')
 
-      // Verificar allowances actuales
-      const [flexibleAllowance, vaultAllowance] = await Promise.all([
+      // Detectar asset handler
+      const assetHandler = await detectAssetHandler(loanAssetAddress)
+      if (!assetHandler) {
+        throw new Error('No asset handler found for loan token')
+      }
+
+      // Calcular distribución del pago parcial según lógica de FlexibleLoanManager
+      const protocolFee = 5000n // 0.5%
+      const interestPayment = amount > accruedInterest ? accruedInterest : amount
+      const principalPayment = amount - interestPayment
+      const interestFee = (interestPayment * protocolFee) / 1000000n
+
+      console.log('📊 Partial payment breakdown:')
+      console.log('  Interest fee:', formatUnits(interestFee, 6), 'USDC')
+      console.log('  Principal:', formatUnits(principalPayment, 6), 'USDC')
+
+      // Verificar allowances y aprobar solo si es necesario
+      const [loanManagerAllowance, assetHandlerAllowance] = await Promise.all([
         publicClient?.readContract({
           address: loanAssetAddress,
           abi: ERC20_ABI,
@@ -762,33 +843,36 @@ export function useUserPositions() {
           address: loanAssetAddress,
           abi: ERC20_ABI,
           functionName: 'allowance',
-          args: [address, contractAddresses.vaultBasedHandler]
+          args: [address, assetHandler]
         }) as Promise<bigint>
       ])
 
-      // Solo aprobar si es necesario
       const approvalPromises = []
       let approvalsNeeded = 0
+
+      const bufferMultiplier = 120n // 120% buffer
+      const safeInterestFee = (interestFee * bufferMultiplier) / 100n
+      const safePrincipalAmount = (principalPayment * bufferMultiplier) / 100n
       
-      if (!flexibleAllowance || flexibleAllowance < generousAmount) {
+      if (!loanManagerAllowance || loanManagerAllowance < safeInterestFee) {
         approvalPromises.push(
           writeContractAsync({
             address: loanAssetAddress,
             abi: ERC20_ABI,
             functionName: 'approve',
-            args: [contractAddresses.flexibleLoanManager, generousAmount]
+            args: [contractAddresses.flexibleLoanManager, safeInterestFee]
           })
         )
         approvalsNeeded++
       }
 
-      if (!vaultAllowance || vaultAllowance < generousAmount) {
+      if (!assetHandlerAllowance || assetHandlerAllowance < safePrincipalAmount) {
         approvalPromises.push(
           writeContractAsync({
             address: loanAssetAddress,
             abi: ERC20_ABI,
             functionName: 'approve',
-            args: [contractAddresses.vaultBasedHandler, generousAmount]
+            args: [assetHandler, safePrincipalAmount]
           })
         )
         approvalsNeeded++
@@ -847,7 +931,7 @@ export function useUserPositions() {
     } catch (error: any) {
       setTransactionStep('idle')
       
-      let errorMessage = 'Optimized partial repayment failed'
+      let errorMessage = 'Partial repayment failed'
       
       if (error?.message?.includes('User rejected') || 
           error?.message?.includes('User denied') ||
@@ -875,7 +959,8 @@ export function useUserPositions() {
     writeContractAsync,
     resetTx,
     refreshPositions,
-    publicClient
+    publicClient,
+    detectAssetHandler
   ])
 
   const isProcessing = isLoading || isLoadingIds || isLoadingData || 

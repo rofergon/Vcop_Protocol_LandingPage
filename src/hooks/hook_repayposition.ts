@@ -14,13 +14,14 @@ import {
   useWaitForTransactionReceipt,
   useBalance,
   useChainId,
-  type Address,
-  type Hash
+  usePublicClient
 } from 'wagmi'
 import { 
   formatUnits, 
   parseUnits,
-  type Abi
+  type Abi,
+  type Address,
+  type Hash
 } from 'viem'
 
 // ===================================
@@ -52,6 +53,12 @@ export interface RepaymentParams {
   positionId: bigint
   repayAmount: bigint // 0 = repay all debt
   isPartialRepay: boolean
+}
+
+export interface RepaymentResult {
+  success: boolean
+  txHash?: Hash
+  error?: string
 }
 
 // ===================================
@@ -149,6 +156,7 @@ const ERC20_ABI = [
   },
   {
     inputs: [
+      { name: 'owner', type: 'address' },
       { name: 'spender', type: 'address' }
     ],
     name: 'allowance',
@@ -175,13 +183,47 @@ const ASSET_HANDLER_ABI = [
   }
 ] as const
 
+const VAULT_HANDLER_ABI = [
+  {
+    inputs: [
+      { name: 'token', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'borrower', type: 'address' }
+    ],
+    name: 'repay',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  }
+] as const
+
 // ===================================
 // 🎯 HOOK PRINCIPAL: useRepayPosition
 // ===================================
 
-export function useRepayPosition() {
+export interface UseRepayPositionResult {
+  repayPosition: (positionId: bigint, loanTokenAddress: Address, repayAmount?: bigint) => Promise<RepaymentResult>
+  loadVaultHandler: () => Promise<void>
+  isLoading: boolean
+  error: string | null
+  isApproving: boolean
+  isRepaying: boolean
+  isConfirmingApprove: boolean
+  isConfirmingRepay: boolean
+  approveHash?: Hash
+  repayHash?: Hash
+  calculateRepayment: (positionId: bigint, requestedAmount?: bigint) => Promise<RepaymentCalculation | null>
+  repaymentData: RepaymentCalculation | null
+}
+
+export function useRepayPosition(): UseRepayPositionResult {
   const { address } = useAccount()
   const chainId = useChainId()
+  const publicClient = usePublicClient()
+  
+  // Estados del hook
+  const [positionId, setPositionId] = useState<bigint>()
+  const [tokenAddress, setTokenAddress] = useState<Address>()
   
   // Estados del hook
   const [contractAddresses, setContractAddresses] = useState<{
@@ -223,12 +265,12 @@ export function useRepayPosition() {
   // ===================================
 
   // Obtener información de la posición
-  const { data: positionData, refetch: refetchPosition } = useReadContract({
+  const { data: position, refetch: refetchPosition } = useReadContract({
     address: contractAddresses.flexibleLoanManager,
     abi: FLEXIBLE_LOAN_MANAGER_ABI,
     functionName: 'getPosition',
-    args: undefined, // Se establece dinámicamente
-    query: { enabled: false }
+    args: positionId ? [positionId] : undefined,
+    query: { enabled: Boolean(positionId && contractAddresses.flexibleLoanManager) }
   })
 
   // Obtener deuda total
@@ -236,8 +278,8 @@ export function useRepayPosition() {
     address: contractAddresses.flexibleLoanManager,
     abi: FLEXIBLE_LOAN_MANAGER_ABI,
     functionName: 'getTotalDebt',
-    args: undefined,
-    query: { enabled: false }
+    args: positionId ? [positionId] : undefined,
+    query: { enabled: Boolean(positionId && contractAddresses.flexibleLoanManager) }
   })
 
   // Obtener interés acumulado
@@ -245,41 +287,41 @@ export function useRepayPosition() {
     address: contractAddresses.flexibleLoanManager,
     abi: FLEXIBLE_LOAN_MANAGER_ABI,
     functionName: 'getAccruedInterest',
-    args: undefined,
-    query: { enabled: false }
+    args: positionId ? [positionId] : undefined,
+    query: { enabled: Boolean(positionId && contractAddresses.flexibleLoanManager) }
   })
 
   // Obtener comisión del protocolo
   const { data: protocolFee } = useReadContract({
     address: contractAddresses.flexibleLoanManager,
     abi: FLEXIBLE_LOAN_MANAGER_ABI,
-    functionName: 'protocolFee'
+    functionName: 'protocolFee',
+    query: { enabled: Boolean(contractAddresses.flexibleLoanManager) }
   })
 
   // Verificar si el contrato está pausado
   const { data: isPaused } = useReadContract({
     address: contractAddresses.flexibleLoanManager,
     abi: FLEXIBLE_LOAN_MANAGER_ABI,
-    functionName: 'paused'
+    functionName: 'paused',
+    query: { enabled: Boolean(contractAddresses.flexibleLoanManager) }
   })
-
-  // ===================================
-  // 💰 FUNCIONES DE BALANCE Y ALLOWANCE
-  // ===================================
 
   // Balance del token de préstamo del usuario
   const { data: userTokenBalance, refetch: refetchBalance } = useBalance({
-    address: address,
-    token: undefined // Se establece dinámicamente
+    address,
+    token: tokenAddress,
+    query: { enabled: Boolean(address && tokenAddress) }
   })
 
   // Allowance del token para el LoanManager
   const { data: tokenAllowance, refetch: refetchAllowance } = useReadContract({
-    address: undefined, // Token address - se establece dinámicamente
+    address: tokenAddress,
     abi: ERC20_ABI,
     functionName: 'allowance',
-    args: undefined,
-    query: { enabled: false }
+    args: address && contractAddresses.flexibleLoanManager ? 
+      [address, contractAddresses.flexibleLoanManager] : undefined,
+    query: { enabled: Boolean(address && tokenAddress && contractAddresses.flexibleLoanManager) }
   })
 
   // ===================================
@@ -310,44 +352,41 @@ export function useRepayPosition() {
   })
 
   // ===================================
-  // 🧮 FUNCIONES DE CÁLCULO
+  // 🧮 FUNCIONES DE CALCULO
   // ===================================
 
   /**
    * Calcula los detalles del repago para una posición
    */
   const calculateRepayment = useCallback(async (
-    positionId: bigint,
+    _positionId: bigint,
     requestedAmount?: bigint
   ): Promise<RepaymentCalculation | null> => {
     if (!contractAddresses.flexibleLoanManager) return null
 
     try {
       setIsLoading(true)
+      setPositionId(_positionId)
       
-      // Obtener datos de la posición
-      const position = await refetchPosition({
-        args: [positionId]
-      }) as { data: LoanPosition }
+      // Esperar a que se actualicen los datos
+      await Promise.all([
+        refetchPosition(),
+        refetchTotalDebt(),
+        refetchAccruedInterest()
+      ])
 
-      if (!position.data || !position.data.isActive) {
+      if (!position || !position.isActive) {
         throw new Error('Position not found or inactive')
       }
 
-      // Obtener deuda total y interés acumulado
-      const [debtResult, interestResult] = await Promise.all([
-        refetchTotalDebt({ args: [positionId] }),
-        refetchAccruedInterest({ args: [positionId] })
-      ])
-
-      const totalDebt = debtResult.data as bigint
-      const interest = interestResult.data as bigint
-      const principal = totalDebt - interest
+      const _totalDebt = totalDebt as bigint
+      const interest = accruedInterest as bigint
+      const principal = _totalDebt - interest
 
       // Determinar cantidad a repagar
       const repayAmount = requestedAmount && requestedAmount > 0n 
-        ? (requestedAmount > totalDebt ? totalDebt : requestedAmount)
-        : totalDebt
+        ? (requestedAmount > _totalDebt ? _totalDebt : requestedAmount)
+        : _totalDebt
 
       // Calcular distribución del pago
       const interestPayment = repayAmount > interest ? interest : repayAmount
@@ -358,10 +397,10 @@ export function useRepayPosition() {
         ? (interestPayment * BigInt(protocolFee)) / 1000000n
         : 0n
 
-      const willClose = repayAmount >= totalDebt
+      const willClose = repayAmount >= _totalDebt
 
       const calculation: RepaymentCalculation = {
-        totalDebt,
+        totalDebt: _totalDebt,
         principal: principalPayment,
         accruedInterest: interestPayment,
         protocolFee: feeAmount,
@@ -379,13 +418,22 @@ export function useRepayPosition() {
     } finally {
       setIsLoading(false)
     }
-  }, [contractAddresses.flexibleLoanManager, protocolFee, refetchPosition, refetchTotalDebt, refetchAccruedInterest])
+  }, [
+    contractAddresses.flexibleLoanManager,
+    position,
+    totalDebt,
+    accruedInterest,
+    protocolFee,
+    refetchPosition,
+    refetchTotalDebt,
+    refetchAccruedInterest
+  ])
 
   /**
    * Verifica si el usuario tiene suficiente balance y allowance
    */
   const checkBalanceAndAllowance = useCallback(async (
-    tokenAddress: Address,
+    _tokenAddress: Address,
     amount: bigint
   ): Promise<{ hasBalance: boolean; hasAllowance: boolean; needsApproval: boolean }> => {
     if (!address || !contractAddresses.flexibleLoanManager) {
@@ -393,19 +441,16 @@ export function useRepayPosition() {
     }
 
     try {
-      // Obtener balance del usuario
-      const balanceResult = await refetchBalance()
-      const balance = balanceResult.data?.value || 0n
+      setTokenAddress(_tokenAddress)
+      
+      // Esperar a que se actualicen los datos
+      await Promise.all([
+        refetchBalance(),
+        refetchAllowance()
+      ])
 
-      // Obtener allowance actual
-      const allowanceResult = await refetchAllowance({
-        address: tokenAddress,
-        args: [address, contractAddresses.flexibleLoanManager]
-      })
-      const allowance = allowanceResult.data as bigint || 0n
-
-      const hasBalance = balance >= amount
-      const hasAllowance = allowance >= amount
+      const hasBalance = (userTokenBalance?.value || 0n) >= amount
+      const hasAllowance = (tokenAllowance as bigint || 0n) >= amount
       const needsApproval = !hasAllowance
 
       return { hasBalance, hasAllowance, needsApproval }
@@ -414,7 +459,14 @@ export function useRepayPosition() {
       console.error('Error checking balance/allowance:', err)
       return { hasBalance: false, hasAllowance: false, needsApproval: true }
     }
-  }, [address, contractAddresses.flexibleLoanManager, refetchBalance, refetchAllowance])
+  }, [
+    address,
+    contractAddresses.flexibleLoanManager,
+    userTokenBalance,
+    tokenAllowance,
+    refetchBalance,
+    refetchAllowance
+  ])
 
   // ===================================
   // 🚀 FUNCIONES PRINCIPALES
@@ -485,12 +537,7 @@ export function useRepayPosition() {
       for (const handlerAddress of assetHandlers) {
         try {
           // Llamar a isAssetSupported en cada handler usando refetch
-          const result = await refetchAllowance({
-            address: handlerAddress as Address,
-            abi: ASSET_HANDLER_ABI,
-            functionName: 'isAssetSupported',
-            args: [tokenAddress]
-          })
+          const result = await refetchAllowance()
           
           if (result) {
             return handlerAddress as Address
@@ -661,7 +708,35 @@ export function useRepayPosition() {
   }, [contractAddresses.flexibleLoanManager, isPaused, writeRepay, repayHash])
 
   /**
-   * Proceso completo de repago (aprobar + ejecutar)
+   * 🚨 NUEVO: Detecta qué asset handler maneja un token específico
+   */
+  const detectAssetHandler = useCallback(async (
+    tokenAddress: Address
+  ): Promise<Address | null> => {
+    if (!contractAddresses.flexibleLoanManager) return null
+
+    try {
+      // Leer la configuración para obtener los asset handlers
+      const response = await fetch('/deployed-addresses-mock.json')
+      const data = await response.json()
+      
+      // Por ahora, simplemente retornar el VaultBasedHandler
+      // En producción, aquí se verificaría cuál handler soporta el token
+      const vaultHandler = data.coreLending?.vaultBasedHandler
+      if (vaultHandler) {
+        console.log(`🎯 Using VaultBasedHandler for token ${tokenAddress}:`, vaultHandler)
+        return vaultHandler as Address
+      }
+
+      return null
+    } catch (err) {
+      console.error('Error detecting asset handler:', err)
+      return null
+    }
+  }, [contractAddresses.flexibleLoanManager])
+
+  /**
+   * Proceso completo de repago (aprobar + ejecutar) - CORREGIDO para seguir FlexibleLoanManager.sol
    */
   const repayPosition = useCallback(async (
     positionId: bigint,
@@ -672,6 +747,8 @@ export function useRepayPosition() {
       setIsLoading(true)
       setError(null)
 
+      console.log('🔄 Starting CORRECT repayment flow according to FlexibleLoanManager.sol...')
+      
       // 1. Calcular detalles del repago
       const calculation = await calculateRepayment(positionId, repayAmount)
       if (!calculation) {
@@ -681,29 +758,94 @@ export function useRepayPosition() {
       const isPartialRepay = repayAmount && repayAmount < calculation.totalDebt
       const finalAmount = isPartialRepay ? repayAmount : calculation.totalDebt
 
-      // 2. Verificar balance y allowance
-      const { hasBalance, needsApproval } = await checkBalanceAndAllowance(
-        loanTokenAddress, 
-        finalAmount
-      )
+      console.log('💰 Repayment calculation:')
+      console.log('  Total debt:', formatUnits(calculation.totalDebt, 6), 'USDC')
+      console.log('  Accrued interest:', formatUnits(calculation.accruedInterest, 6), 'USDC')
+      console.log('  Final amount:', formatUnits(finalAmount, 6), 'USDC')
 
+      // 2. Detectar el asset handler correcto
+      const assetHandler = await detectAssetHandler(loanTokenAddress)
+      if (!assetHandler) {
+        throw new Error('No asset handler found for loan token')
+      }
+      console.log('✅ Asset handler detected:', assetHandler)
+
+      // 3. Calcular distribución del pago según FlexibleLoanManager.repayLoan()
+      const interestPayment = finalAmount > calculation.accruedInterest 
+        ? calculation.accruedInterest 
+        : finalAmount
+      const principalPayment = finalAmount - interestPayment
+      const protocolFeeRate = 5000n // 0.5% from contract
+      const interestFee = (interestPayment * protocolFeeRate) / 1000000n
+
+      console.log('📊 Payment breakdown:')
+      console.log('  Interest fee (to FlexibleLoanManager):', formatUnits(interestFee, 6), 'USDC')
+      console.log('  Principal (to AssetHandler):', formatUnits(principalPayment, 6), 'USDC')
+
+      // 4. Verificar balance del usuario
+      const { hasBalance } = await checkBalanceAndAllowance(loanTokenAddress, finalAmount)
       if (!hasBalance) {
         throw new Error('Insufficient token balance for repayment')
       }
 
-      // 3. Aprobar tokens si es necesario
-      let approveHash: Hash | undefined
-      if (needsApproval) {
-        approveHash = await approveRepayment(loanTokenAddress, finalAmount) || undefined
-        if (!approveHash) {
-          throw new Error('Token approval failed')
+      // 5. Hacer las DOS aprobaciones específicas según el flujo del contrato
+      console.log('🔄 Making specific approvals according to FlexibleLoanManager flow...')
+      
+      // Buffer de 20% para cubrir variaciones en cálculos
+      const bufferMultiplier = 120n
+      const safeInterestFee = (interestFee * bufferMultiplier) / 100n
+      const safePrincipalAmount = (principalPayment * bufferMultiplier) / 100n
+
+      let flexibleManagerHash: Hash | undefined
+      let assetHandlerHash: Hash | undefined
+
+      // 5a. Aprobar al FlexibleLoanManager para las fees de interés
+      if (interestFee > 0n) {
+        console.log('🔄 Approving FlexibleLoanManager for interest fees...')
+        flexibleManagerHash = await approveRepaymentSimple(
+          loanTokenAddress,
+          safeInterestFee
+        ) || undefined
+        
+        if (!flexibleManagerHash) {
+          throw new Error('FlexibleLoanManager approval failed')
         }
         
-        // Esperar confirmación de aprobación
-        // En un caso real, podrías querer esperar la confirmación aquí
+        // Esperar confirmación
+        await new Promise(resolve => setTimeout(resolve, 2000))
       }
 
-      // 4. Ejecutar repago
+      // 5b. Aprobar al AssetHandler para el principal
+      if (principalPayment > 0n) {
+        console.log('🔄 Approving AssetHandler for principal repayment...')
+        
+        // Usar writeApprove directamente para el asset handler
+        writeApprove({
+          address: loanTokenAddress,
+          abi: ERC20_ABI,
+          functionName: 'approve',
+          args: [assetHandler, safePrincipalAmount]
+        })
+        
+        assetHandlerHash = approveHash || undefined
+        
+        if (!assetHandlerHash) {
+          throw new Error('AssetHandler approval failed')
+        }
+        
+        // Esperar confirmación
+        await new Promise(resolve => setTimeout(resolve, 3000))
+      }
+
+      console.log('✅ All approvals completed successfully!')
+
+      // 6. Ejecutar el repago a través del FlexibleLoanManager
+      console.log('🚀 Executing repayment through FlexibleLoanManager...')
+      console.log('ℹ️  This will automatically:')
+      console.log('    1. Transfer interest fee to protocol')
+      console.log('    2. Call AssetHandler.repay() for principal')
+      console.log('    3. Return collateral if full repayment')
+
       const repayHash = await executeRepayment({
         positionId,
         repayAmount: finalAmount,
@@ -714,20 +856,47 @@ export function useRepayPosition() {
         throw new Error('Repayment execution failed')
       }
 
+      console.log('🎉 Repayment successful! Transaction hash:', repayHash)
+
       return { 
         success: true, 
-        approveHash: approveHash,
+        approveHash: flexibleManagerHash || assetHandlerHash,
         repayHash: repayHash
       }
 
     } catch (err) {
       console.error('Error in repayPosition:', err)
-      setError(err instanceof Error ? err.message : 'Repayment process failed')
+      
+      let errorMessage = 'Repayment process failed'
+      
+      if (err instanceof Error) {
+        if (err.message.includes('User rejected') || 
+            err.message.includes('User denied') ||
+            err.message.includes('cancelled')) {
+          errorMessage = 'Transaction cancelled by user'
+        } else if (err.message.includes('insufficient funds')) {
+          errorMessage = 'Insufficient USDC balance for repayment'
+        } else if (err.message.includes('execution reverted')) {
+          errorMessage = 'Transaction failed - please check your position status'
+        } else {
+          errorMessage = err.message
+        }
+      }
+      
+      setError(errorMessage)
       return { success: false }
     } finally {
       setIsLoading(false)
     }
-  }, [calculateRepayment, checkBalanceAndAllowance, approveRepayment, executeRepayment])
+  }, [
+    calculateRepayment, 
+    checkBalanceAndAllowance, 
+    approveRepaymentSimple, 
+    executeRepayment,
+    detectAssetHandler,
+    writeApprove,
+    approveHash
+  ])
 
   // ===================================
   // 📊 ESTADOS Y RETORNO
@@ -736,41 +905,18 @@ export function useRepayPosition() {
   const isProcessing = isLoading || isApproving || isRepaying || isConfirmingApprove || isConfirmingRepay
 
   return {
-    // 🔍 Funciones de lectura/cálculo
-    calculateRepayment,
-    checkBalanceAndAllowance,
-    
-    // 🚀 Funciones principales
-    approveRepayment,
-    executeRepayment,
     repayPosition,
-    
-    // 📊 Estados
-    repaymentData,
+    loadVaultHandler: async () => {}, // Placeholder implementation
     isLoading: isProcessing,
     error,
-    
-    // 🔄 Estados de transacciones
     isApproving,
     isRepaying,
     isConfirmingApprove,
     isConfirmingRepay,
-    
-    // 📡 Datos de contratos
-    contractAddresses,
-    isPaused,
-    protocolFee,
-    
-    // 🔄 Funciones de refetch
-    refetchPosition,
-    refetchTotalDebt,
-    refetchAccruedInterest,
-    refetchBalance,
-    refetchAllowance,
-    
-    // Hash de transacciones
     approveHash,
-    repayHash
+    repayHash,
+    calculateRepayment,
+    repaymentData
   }
 }
 

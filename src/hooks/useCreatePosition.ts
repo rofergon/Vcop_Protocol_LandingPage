@@ -24,6 +24,9 @@ import {
 import FlexibleLoanManagerABI from '../Abis/FlexibleLoanManager.json'
 import VaultBasedHandlerABI from '../Abis/VaultBasedHandler.json'
 
+// Importar hook centralizado de direcciones
+import useContractAddresses from './useContractAddresses'
+
 // ===================================
 // 🔧 TIPOS PRINCIPALES
 // ===================================
@@ -95,10 +98,8 @@ const ERC20_ABI = [
 // ===================================
 
 export function useCreatePosition({
-  addresses,
   autoVerifyBalances = true
 }: {
-  addresses: ContractAddresses
   autoVerifyBalances?: boolean
 }) {
   
@@ -115,26 +116,30 @@ export function useCreatePosition({
   const { address, isConnected } = useAccount()
   const chainId = useChainId()
   
+  // Hook centralizado de direcciones
+  const { addresses, isReady: addressesReady, error: addressesError } = useContractAddresses()
+  
   // Balances usando useBalance de wagmi v2
   const { data: ethBalance, refetch: refetchETHBalance } = useBalance({
     address,
-    token: addresses.mockETH,
-    query: { enabled: !!address && autoVerifyBalances }
+    token: addresses?.mockETH,
+    query: { enabled: !!address && autoVerifyBalances && !!addresses?.mockETH }
   })
   
   const { data: usdcBalance, refetch: refetchUSDCBalance } = useBalance({
     address, 
-    token: addresses.mockUSDC,
-    query: { enabled: !!address && autoVerifyBalances }
+    token: addresses?.mockUSDC,
+    query: { enabled: !!address && autoVerifyBalances && !!addresses?.mockUSDC }
   })
 
   // Allowance check
   const { data: ethAllowance, refetch: refetchAllowance } = useReadContract({
-    address: addresses.mockETH,
+    address: addresses?.mockETH,
     abi: ERC20_ABI,
     functionName: 'allowance',
-    args: address && addresses.flexibleLoanManager ? [address, addresses.flexibleLoanManager] : undefined,
-    query: { enabled: !!address }
+    args: address && addresses?.flexibleLoanManager && addresses?.mockETH ? 
+      [address, addresses.flexibleLoanManager] : undefined,
+    query: { enabled: !!address && !!addresses?.mockETH }
   })
 
   // Write contracts usando wagmi v2
@@ -188,6 +193,10 @@ export function useCreatePosition({
       return { valid: true, message: 'Balance check skipped' }
     }
 
+    if (!addresses) {
+      return { valid: false, message: 'Contract addresses not loaded' }
+    }
+
     // Determinar qué asset es el collateral y cuánto necesitamos
     const collateralAsset = terms?.collateralAsset || addresses.mockETH
     const collateralAmount = terms?.collateralAmount || parseUnits('1', 18)
@@ -228,6 +237,11 @@ export function useCreatePosition({
   const createPosition = useCallback(async (customTerms?: Partial<LoanTerms>) => {
     if (!isConnected || !address) {
       updateState({ error: 'Please connect your wallet' })
+      return
+    }
+
+    if (!addresses) {
+      updateState({ error: 'Contract addresses not loaded' })
       return
     }
 
@@ -300,7 +314,7 @@ export function useCreatePosition({
 
   // Manejar confirmación de approve
   useEffect(() => {
-    if (isApproveSuccess && state.step === 'approving') {
+    if (isApproveSuccess && state.step === 'approving' && addresses) {
       updateState({ step: 'creating' })
       refetchAllowance()
 
@@ -408,15 +422,6 @@ export function useCreatePosition({
   }
 }
 
-// ===================================
-// 🏠 DIRECCIONES DE BASE SEPOLIA
-// ===================================
-
-export const BASE_SEPOLIA_ADDRESSES: ContractAddresses = {
-  flexibleLoanManager: '0xAdD8cA97DcbCf7373Da978bc7b61d6Ca31b54F8d',
-  vaultBasedHandler: '0xC067Bb15D0f7c134916dC82949a9c4d27e6bbbC4',
-  mockETH: '0xDe3fd80E2bcCc96f5FB43ac7481036Db9998f521',
-  mockUSDC: '0x45BdA644DD25600b7d6DF4EC87E9710AD1DAE9d9',
-  mockWBTC: '0x03f43Ce344D9988138b4807a7392A9feDea83AA1',
-  vcopToken: '0x32224a6edf252c711B24f61403be011e6A7BEaEf'
-}
+// DEPRECATED: Esta constante ya no se usa
+// Las direcciones ahora se cargan dinámicamente desde deployed-addresses-mock.json
+// usando el hook useContractAddresses()
