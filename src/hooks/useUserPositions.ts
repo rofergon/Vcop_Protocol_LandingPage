@@ -518,7 +518,7 @@ export function useUserPositions() {
   }, [refetchPositionIds, refetchPositionData])
 
   /**
-   * Repagar completamente una posición usando aprobaciones directas ERC20
+   * Repagar completamente una posición con UX optimizada (menos clicks)
    */
   const repayFullPosition = useCallback(async (
     positionId: bigint,
@@ -541,90 +541,162 @@ export function useUserPositions() {
       const totalDebt = positionData.totalDebt
       const accruedInterest = positionData.accruedInterest
       
-      // 🔧 FLUJO CORRECTO IDENTIFICADO:
-      // 1. FlexibleLoanManager.repayLoan() hace: safeTransferFrom(user, feeCollector, fee)
-      // 2. VaultBasedHandler.repay() hace: safeTransferFrom(user, vaultHandler, principal)
-      // 
-      // Por lo tanto, necesitamos aprobar tokens a AMBOS contratos
-      
-      // Calcular montos exactos
+      // 🎯 OPTIMIZACIÓN: Usar un monto generoso para evitar problemas de precisión
+      // El contrato automáticamente usará solo lo que necesita
       const repayAmount = totalDebt
       const interestPayment = repayAmount > accruedInterest ? accruedInterest : repayAmount
       const principalPayment = repayAmount - interestPayment
       const protocolFee = 5000n // 0.5%
       const interestFee = (interestPayment * protocolFee) / 1000000n
       
-      // Montos que necesita cada contrato:
-      const flexibleLoanManagerAmount = interestFee // Para el fee al feeCollector
-      const vaultBasedHandlerAmount = principalPayment // Para el principal al vault
-      const totalApprovalAmount = flexibleLoanManagerAmount + vaultBasedHandlerAmount
-      const approvalBuffer = (totalApprovalAmount * 15n) / 100n // 15% buffer
-      const finalApprovalAmount = totalApprovalAmount + approvalBuffer
+      // 🚀 CLAVE: Usar monto generoso para asegurar que cubra todo
+      // Incluir buffer del 50% para cubrir cualquier variación en cálculos
+      const totalNeedAmount = interestFee + principalPayment
+      const generousAmount = totalNeedAmount + (totalNeedAmount * 50n) / 100n // 50% buffer
 
-      console.log('🔄 Starting direct ERC20 approval repayment...')
+      console.log('🔄 Starting optimized repayment (reduced clicks)...')
       console.log('💰 Total debt:', formatUnits(totalDebt, 6), 'USDC')
-      console.log('💸 Interest fee (to FlexibleLoanManager):', formatUnits(interestFee, 6), 'USDC')
-      console.log('💸 Principal payment (to VaultBasedHandler):', formatUnits(principalPayment, 6), 'USDC')
-      console.log('💸 Total approval needed:', formatUnits(totalApprovalAmount, 6), 'USDC')
-      console.log('✅ Final approval amount (with buffer):', formatUnits(finalApprovalAmount, 6), 'USDC')
+      console.log('💸 Interest fee:', formatUnits(interestFee, 6), 'USDC')
+      console.log('💸 Principal payment:', formatUnits(principalPayment, 6), 'USDC')
+      console.log('✅ Generous approval amount:', formatUnits(generousAmount, 6), 'USDC')
 
-      // Paso 1: Aprobar tokens al FlexibleLoanManager (para el fee)
       setTransactionStep('approving')
-      console.log('🔄 Approving FlexibleLoanManager for fee handling...')
+
+      // 🎯 OPTIMIZACIÓN 1: Verificar allowances actuales primero
+      const [flexibleAllowance, vaultAllowance] = await Promise.all([
+        publicClient?.readContract({
+          address: loanAssetAddress,
+          abi: ERC20_ABI,
+          functionName: 'allowance',
+          args: [address, contractAddresses.flexibleLoanManager]
+        }) as Promise<bigint>,
+        publicClient?.readContract({
+          address: loanAssetAddress,
+          abi: ERC20_ABI,
+          functionName: 'allowance',
+          args: [address, contractAddresses.vaultBasedHandler]
+        }) as Promise<bigint>
+      ])
+
+      console.log('🔍 Current allowances:')
+      console.log('  FlexibleLoanManager:', formatUnits(flexibleAllowance || 0n, 6), 'USDC')
+      console.log('  VaultBasedHandler:', formatUnits(vaultAllowance || 0n, 6), 'USDC')
+
+      // 🎯 OPTIMIZACIÓN 2: Solo aprobar si es necesario
+      const approvalPromises = []
+      let approvalsNeeded = 0
       
-      const approveFlexibleHash = await writeContractAsync({
-        address: loanAssetAddress,
-        abi: ERC20_ABI,
-        functionName: 'approve',
-        args: [contractAddresses.flexibleLoanManager, finalApprovalAmount]
-      })
+      if (!flexibleAllowance || flexibleAllowance < generousAmount) {
+        console.log('🔄 Will approve FlexibleLoanManager...')
+        approvalPromises.push(
+          writeContractAsync({
+            address: loanAssetAddress,
+            abi: ERC20_ABI,
+            functionName: 'approve',
+            args: [contractAddresses.flexibleLoanManager, generousAmount]
+          })
+        )
+        approvalsNeeded++
+      }
 
-      console.log('✅ FlexibleLoanManager approval successful! Hash:', approveFlexibleHash)
+      if (!vaultAllowance || vaultAllowance < generousAmount) {
+        console.log('🔄 Will approve VaultBasedHandler...')
+        approvalPromises.push(
+          writeContractAsync({
+            address: loanAssetAddress,
+            abi: ERC20_ABI,
+            functionName: 'approve',
+            args: [contractAddresses.vaultBasedHandler, generousAmount]
+          })
+        )
+        approvalsNeeded++
+      }
 
-      // Paso 2: Aprobar tokens al VaultBasedHandler (para el principal)
-      console.log('🔄 Approving VaultBasedHandler for principal handling...')
-      
-      const approveVaultHash = await writeContractAsync({
-        address: loanAssetAddress,
-        abi: ERC20_ABI,
-        functionName: 'approve',
-        args: [contractAddresses.vaultBasedHandler, finalApprovalAmount]
-      })
+      // 🎯 OPTIMIZACIÓN 3: Ejecutar aprobaciones en paralelo si es necesario
+      if (approvalPromises.length > 0) {
+        console.log(`🚀 Executing ${approvalPromises.length} approval(s) in parallel...`)
+        console.log(`ℹ️  You will need to sign ${approvalsNeeded} approval transaction(s) + 1 repayment transaction`)
+        
+        try {
+          await Promise.all(approvalPromises)
+          console.log('✅ All approvals completed!')
+          
+          // Esperar menos tiempo ya que las aprobaciones son más confiables
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        } catch (approvalError: any) {
+          // 🎯 MANEJO ESPECÍFICO DE ERRORES DE APROBACIÓN
+          if (approvalError?.message?.includes('User rejected') || 
+              approvalError?.message?.includes('User denied') ||
+              approvalError?.name === 'UserRejectedRequestError') {
+            console.log('❌ User cancelled approval transaction')
+            setTransactionStep('idle')
+            return { success: false, error: 'Transaction cancelled by user' }
+          }
+          throw approvalError // Re-throw si no es cancelación de usuario
+        }
+      } else {
+        console.log('✅ Sufficient allowances already exist, skipping approvals!')
+        console.log('ℹ️  You will only need to sign 1 repayment transaction')
+      }
 
-      console.log('✅ VaultBasedHandler approval successful! Hash:', approveVaultHash)
-
-      // Paso 3: Esperar un poco para que las aprobaciones se propaguen
-      console.log('⏳ Waiting for approvals to propagate...')
-      await new Promise(resolve => setTimeout(resolve, 5000))
-
-      // Paso 4: Ejecutar repago a través de FlexibleLoanManager
-      // Este método internamente:
-      // - Transferirá el fee desde el usuario al feeCollector
-      // - Llamará a VaultBasedHandler.repay() que transferirá el principal desde el usuario al vault
+      // 🎯 OPTIMIZACIÓN 4: Ejecutar repago con monto exacto de totalDebt
+      // Esto debería cerrar la posición automáticamente según el contrato
       setTransactionStep('repaying')
-      console.log('🚀 Executing repayment via FlexibleLoanManager...')
+      console.log('🚀 Executing full repayment to close position...')
+      console.log('ℹ️  This transaction will automatically close your position and return collateral')
 
-      const repayHash = await writeContractAsync({
-        address: contractAddresses.flexibleLoanManager,
-        abi: FLEXIBLE_LOAN_MANAGER_ABI,
-        functionName: 'repayLoan',
-        args: [positionId, totalDebt]
-      })
+      try {
+        const repayHash = await writeContractAsync({
+          address: contractAddresses.flexibleLoanManager,
+          abi: FLEXIBLE_LOAN_MANAGER_ABI,
+          functionName: 'repayLoan',
+          args: [positionId, totalDebt] // Usar totalDebt para repago completo
+        })
 
-      console.log('🎉 Repayment successful! Hash:', repayHash)
+        console.log('🎉 Full repayment successful! Position should be closed automatically.')
+        console.log('📄 Transaction hash:', repayHash)
+        setTransactionStep('idle')
+        
+        // Refrescar datos más rápido para mostrar el cambio
+        setTimeout(() => {
+          refreshPositions()
+        }, 1500)
+        
+        return { success: true, txHash: repayHash }
+      } catch (repayError: any) {
+        // 🎯 MANEJO ESPECÍFICO DE ERRORES DE REPAGO
+        if (repayError?.message?.includes('User rejected') || 
+            repayError?.message?.includes('User denied') ||
+            repayError?.name === 'UserRejectedRequestError') {
+          console.log('❌ User cancelled repayment transaction')
+          setTransactionStep('idle')
+          return { success: false, error: 'Repayment cancelled by user' }
+        }
+        throw repayError // Re-throw si no es cancelación de usuario
+      }
+
+    } catch (error: any) {
       setTransactionStep('idle')
       
-      // Refrescar datos después del repago exitoso
-      setTimeout(() => {
-        refreshPositions()
-      }, 3000)
+      // 🎯 MANEJO INTELIGENTE DE ERRORES
+      let errorMessage = 'Optimized repayment failed'
       
-      return { success: true, txHash: repayHash }
-
-    } catch (error) {
-      setTransactionStep('idle')
-      console.error('💥 Direct ERC20 repayment error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Direct ERC20 repayment failed'
+      if (error?.message?.includes('User rejected') || 
+          error?.message?.includes('User denied') ||
+          error?.name === 'UserRejectedRequestError') {
+        errorMessage = 'Transaction cancelled by user'
+        console.log('❌ User cancelled transaction')
+      } else if (error?.message?.includes('insufficient funds')) {
+        errorMessage = 'Insufficient USDC balance for repayment'
+        console.error('💰 Insufficient funds error:', error)
+      } else if (error?.message?.includes('execution reverted')) {
+        errorMessage = 'Transaction failed - please check your position status'
+        console.error('🔄 Transaction reverted:', error)
+      } else {
+        console.error('💥 Unexpected repayment error:', error)
+        errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      }
+      
       setError(errorMessage)
       return { success: false, error: errorMessage }
     }
@@ -634,11 +706,12 @@ export function useUserPositions() {
     positionsData,
     writeContractAsync,
     resetTx,
-    refreshPositions
+    refreshPositions,
+    publicClient
   ])
 
   /**
-   * Repagar parcialmente una posición usando aprobaciones directas ERC20
+   * Repagar parcialmente una posición con UX optimizada
    */
   const repayPartialPosition = useCallback(async (
     positionId: bigint,
@@ -661,71 +734,137 @@ export function useUserPositions() {
 
       const accruedInterest = positionData.accruedInterest
       
-      // Calcular montos para repago parcial
+      // Calcular montos para repago parcial con buffer generoso
       const repayAmount = amount
       const interestPayment = repayAmount > accruedInterest ? accruedInterest : repayAmount
       const principalPayment = repayAmount - interestPayment
       const protocolFee = 5000n // 0.5%
       const interestFee = (interestPayment * protocolFee) / 1000000n
       
-      const flexibleLoanManagerAmount = interestFee
-      const vaultBasedHandlerAmount = principalPayment
-      const totalApprovalAmount = flexibleLoanManagerAmount + vaultBasedHandlerAmount
-      const approvalBuffer = (totalApprovalAmount * 15n) / 100n // 15% buffer
-      const finalApprovalAmount = totalApprovalAmount + approvalBuffer
+      const totalNeedAmount = interestFee + principalPayment
+      const generousAmount = totalNeedAmount + (totalNeedAmount * 50n) / 100n // 50% buffer
 
-      console.log('🔄 Starting partial direct ERC20 repayment...')
+      console.log('🔄 Starting optimized partial repayment...')
       console.log('💰 Repay amount:', formatUnits(amount, 6), 'USDC')
-      console.log('💸 Interest fee (to FlexibleLoanManager):', formatUnits(interestFee, 6), 'USDC')
-      console.log('💸 Principal payment (to VaultBasedHandler):', formatUnits(principalPayment, 6), 'USDC')
-      console.log('📊 Total approval needed:', formatUnits(totalApprovalAmount, 6), 'USDC')
-      console.log('✅ Final approval amount (with buffer):', formatUnits(finalApprovalAmount, 6), 'USDC')
+      console.log('✅ Generous approval amount:', formatUnits(generousAmount, 6), 'USDC')
 
-      // Aprobar a ambos contratos
       setTransactionStep('approving')
+
+      // Verificar allowances actuales
+      const [flexibleAllowance, vaultAllowance] = await Promise.all([
+        publicClient?.readContract({
+          address: loanAssetAddress,
+          abi: ERC20_ABI,
+          functionName: 'allowance',
+          args: [address, contractAddresses.flexibleLoanManager]
+        }) as Promise<bigint>,
+        publicClient?.readContract({
+          address: loanAssetAddress,
+          abi: ERC20_ABI,
+          functionName: 'allowance',
+          args: [address, contractAddresses.vaultBasedHandler]
+        }) as Promise<bigint>
+      ])
+
+      // Solo aprobar si es necesario
+      const approvalPromises = []
+      let approvalsNeeded = 0
       
-      const approveFlexibleHash = await writeContractAsync({
-        address: loanAssetAddress,
-        abi: ERC20_ABI,
-        functionName: 'approve',
-        args: [contractAddresses.flexibleLoanManager, finalApprovalAmount]
-      })
+      if (!flexibleAllowance || flexibleAllowance < generousAmount) {
+        approvalPromises.push(
+          writeContractAsync({
+            address: loanAssetAddress,
+            abi: ERC20_ABI,
+            functionName: 'approve',
+            args: [contractAddresses.flexibleLoanManager, generousAmount]
+          })
+        )
+        approvalsNeeded++
+      }
 
-      const approveVaultHash = await writeContractAsync({
-        address: loanAssetAddress,
-        abi: ERC20_ABI,
-        functionName: 'approve',
-        args: [contractAddresses.vaultBasedHandler, finalApprovalAmount]
-      })
+      if (!vaultAllowance || vaultAllowance < generousAmount) {
+        approvalPromises.push(
+          writeContractAsync({
+            address: loanAssetAddress,
+            abi: ERC20_ABI,
+            functionName: 'approve',
+            args: [contractAddresses.vaultBasedHandler, generousAmount]
+          })
+        )
+        approvalsNeeded++
+      }
 
-      console.log('✅ Both approvals successful!')
-      
-      // Esperar propagación
-      await new Promise(resolve => setTimeout(resolve, 5000))
+      if (approvalPromises.length > 0) {
+        console.log(`ℹ️  You will need to sign ${approvalsNeeded} approval transaction(s) + 1 repayment transaction`)
+        
+        try {
+          await Promise.all(approvalPromises)
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        } catch (approvalError: any) {
+          if (approvalError?.message?.includes('User rejected') || 
+              approvalError?.message?.includes('User denied') ||
+              approvalError?.name === 'UserRejectedRequestError') {
+            console.log('❌ User cancelled approval transaction')
+            setTransactionStep('idle')
+            return { success: false, error: 'Transaction cancelled by user' }
+          }
+          throw approvalError
+        }
+      } else {
+        console.log('ℹ️  You will only need to sign 1 repayment transaction')
+      }
 
-      // Ejecutar repago
+      // Ejecutar repago parcial
       setTransactionStep('repaying')
-      const repayHash = await writeContractAsync({
-        address: contractAddresses.flexibleLoanManager,
-        abi: FLEXIBLE_LOAN_MANAGER_ABI,
-        functionName: 'repayLoan',
-        args: [positionId, amount]
-      })
+      
+      try {
+        const repayHash = await writeContractAsync({
+          address: contractAddresses.flexibleLoanManager,
+          abi: FLEXIBLE_LOAN_MANAGER_ABI,
+          functionName: 'repayLoan',
+          args: [positionId, amount]
+        })
 
-      console.log('🎉 Partial repayment successful! Hash:', repayHash)
+        console.log('🎉 Partial repayment successful! Hash:', repayHash)
+        setTransactionStep('idle')
+        
+        setTimeout(() => {
+          refreshPositions()
+        }, 1500)
+        
+        return { success: true, txHash: repayHash }
+      } catch (repayError: any) {
+        if (repayError?.message?.includes('User rejected') || 
+            repayError?.message?.includes('User denied') ||
+            repayError?.name === 'UserRejectedRequestError') {
+          console.log('❌ User cancelled repayment transaction')
+          setTransactionStep('idle')
+          return { success: false, error: 'Repayment cancelled by user' }
+        }
+        throw repayError
+      }
+
+    } catch (error: any) {
       setTransactionStep('idle')
       
-      // Refrescar datos después del repago exitoso
-      setTimeout(() => {
-        refreshPositions()
-      }, 3000)
+      let errorMessage = 'Optimized partial repayment failed'
       
-      return { success: true, txHash: repayHash }
-
-    } catch (error) {
-      setTransactionStep('idle')
-      console.error('💥 Partial direct ERC20 repayment error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Partial direct ERC20 repayment failed'
+      if (error?.message?.includes('User rejected') || 
+          error?.message?.includes('User denied') ||
+          error?.name === 'UserRejectedRequestError') {
+        errorMessage = 'Transaction cancelled by user'
+        console.log('❌ User cancelled transaction')
+      } else if (error?.message?.includes('insufficient funds')) {
+        errorMessage = 'Insufficient USDC balance for repayment'
+        console.error('💰 Insufficient funds error:', error)
+      } else if (error?.message?.includes('execution reverted')) {
+        errorMessage = 'Transaction failed - please check your position status'
+        console.error('🔄 Transaction reverted:', error)
+      } else {
+        console.error('💥 Unexpected partial repayment error:', error)
+        errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      }
+      
       setError(errorMessage)
       return { success: false, error: errorMessage }
     }
@@ -735,7 +874,8 @@ export function useUserPositions() {
     positionsData,
     writeContractAsync,
     resetTx,
-    refreshPositions
+    refreshPositions,
+    publicClient
   ])
 
   const isProcessing = isLoading || isLoadingIds || isLoadingData || 
