@@ -24,27 +24,73 @@ import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { useAppKit } from '@reown/appkit/react';
 import { useCreatePosition, BASE_SEPOLIA_ADDRESSES } from '../hooks/useCreatePosition';
 import type { LoanTerms } from '../hooks/useCreatePosition';
-import { parseUnits } from 'viem';
+import { parseUnits, formatUnits } from 'viem';
 import MockETHFaucet from './components/MockETHFaucet';
+import { useUserPositions } from '../hooks/useUserPositions';
+import DebugPositions from './components/DebugPositions';
 
-// Asset icon component (copiado del InteractiveLoanDemo)
+// Asset icon component con iconos de /public
 const AssetIcon: React.FC<{ asset: string; className?: string }> = ({ asset, className = "w-5 h-5" }) => {
-  switch (asset.toLowerCase()) {
-    case 'eth':
-      return <img src="/ethereum-eth-logo.svg" alt="ETH" className={`${className} inline-block align-middle`} />;
-    case 'wbtc':
-    case 'btc':
-      return <img src="/bitcoin-btc-logo.svg" alt="BTC" className={`${className} inline-block align-middle`} />;
-    case 'vcop':
+  const normalizedAsset = asset.toUpperCase();
+  
+  switch (normalizedAsset) {
+    case 'ETH':
+      return (
+        <img 
+          src="/ethereum-eth-logo.svg" 
+          alt="ETH" 
+          className={`${className} inline-block align-middle`}
+          onError={(e) => {
+            console.warn('Failed to load ETH icon');
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+      );
+    case 'WBTC':
+    case 'BTC':
+      return (
+        <img 
+          src="/bitcoin-btc-logo.svg" 
+          alt="BTC" 
+          className={`${className} inline-block align-middle`}
+          onError={(e) => {
+            console.warn('Failed to load BTC icon');
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+      );
+    case 'VCOP':
       return (
         <div className={`${className} inline-block align-middle bg-gradient-to-br from-emerald-500 to-teal-500 rounded-full p-0.5 flex items-center justify-center`}>
-          <img src="/logovcop.png" alt="VCOP" className="w-full h-full object-contain rounded-full" />
+          <img 
+            src="/logovcop.png" 
+            alt="VCOP" 
+            className="w-full h-full object-contain rounded-full"
+            onError={(e) => {
+              console.warn('Failed to load VCOP icon');
+              e.currentTarget.style.display = 'none';
+            }}
+          />
         </div>
       );
-    case 'usdc':
-      return <img src="/usd-coin-usdc-logo.svg" alt="USDC" className={`${className} inline-block align-middle`} />;
+    case 'USDC':
+      return (
+        <img 
+          src="/usd-coin-usdc-logo.svg" 
+          alt="USDC" 
+          className={`${className} inline-block align-middle`}
+          onError={(e) => {
+            console.warn('Failed to load USDC icon');
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+      );
     default:
-      return <DollarSign className={`${className} inline-block align-middle`} />;
+      return (
+        <div className={`${className} inline-block align-middle bg-gray-100 rounded-full flex items-center justify-center`}>
+          <DollarSign className={`${className.includes('w-') ? 'w-3 h-3' : 'w-4 h-4'} text-gray-500`} />
+        </div>
+      );
   }
 };
 
@@ -727,24 +773,306 @@ const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnected }) 
 };
 
 const MyPositionsTab: React.FC = () => {
+  const { address, isConnected } = useAccount();
+  const {
+    positions,
+    isLoading,
+    error,
+    repayFullPosition,
+    repayPartialPosition,
+    refreshPositions,
+    isRepaying
+  } = useUserPositions();
+
+  // Asset symbol helper - Declarar ANTES de usar en logs
+  const getAssetSymbol = (assetAddress: string): string => {
+    // Mapeo de direcciones exactas (desde deployed-addresses-mock.json)
+    const assetMap: Record<string, string> = {
+      // ETH variants (todas las posibles formas de escribir la dirección)
+      '0xde3fd80e2bccC96f5fb43ac7481036db9998f521': 'ETH',   // mockETH - lowercase
+      '0xDe3fd80E2bcCc96f5FB43ac7481036Db9998f521': 'ETH',   // mockETH - original case
+      
+      // USDC variants
+      '0x45bda644dd25600b7d6df4ec87e9710ad1dae9d9': 'USDC',  // mockUSDC - lowercase
+      '0x45BdA644DD25600b7d6DF4EC87E9710AD1DAE9d9': 'USDC',  // mockUSDC - original case
+      
+      // WBTC variants
+      '0x03f43ce344d9988138b4807a7392a9fedea83aa1': 'WBTC',  // mockWBTC - lowercase
+      '0x03f43Ce344D9988138b4807a7392A9feDea83AA1': 'WBTC',  // mockWBTC - original case
+      
+      // VCOP variants
+      '0x32224a6edf252c711b24f61403be011e6a7bEaEf': 'VCOP',  // vcopToken - lowercase
+      '0x32224a6edf252c711B24f61403be011e6A7BEaEf': 'VCOP'   // vcopToken - original case
+    }
+    
+    const normalizedAddress = assetAddress.toLowerCase()
+    let symbol = assetMap[normalizedAddress]
+    
+    // Si no se encuentra con la dirección normalizada, intenta con la dirección original
+    if (!symbol) {
+      symbol = assetMap[assetAddress]
+    }
+    
+    if (!symbol) {
+      // Fallback para assets no reconocidos
+      if (normalizedAddress.includes('de3fd80e2bccc96f5fb43ac7481036db9998f521')) return 'ETH'
+      if (normalizedAddress.includes('45bda644dd25600b7d6df4ec87e9710ad1dae9d9')) return 'USDC'
+      if (normalizedAddress.includes('03f43ce344d9988138b4807a7392a9fedea83aa1')) return 'WBTC'
+      if (normalizedAddress.includes('32224a6edf252c711b24f61403be011e6a7beaef')) return 'VCOP'
+    }
+    
+    return symbol || 'Unknown'
+  };
+
+
+
+  const formatHealthFactor = (ratio: bigint): string => {
+    if (ratio === 0n) return '0.0';
+    if (ratio >= 5000000n) return '∞'; // 500%+ is considered infinite
+    return (Number(ratio) / 1000000).toFixed(2);
+  };
+
+  const getRiskColor = (ratio: bigint): string => {
+    const numRatio = Number(ratio) / 1000000; // Convert to percentage
+    if (numRatio >= 200) return 'text-green-600';
+    if (numRatio >= 150) return 'text-blue-600';
+    if (numRatio >= 120) return 'text-yellow-600';
+    if (numRatio >= 110) return 'text-orange-600';
+    return 'text-red-600';
+  };
+
+  const getRiskBgColor = (ratio: bigint): string => {
+    const numRatio = Number(ratio) / 1000000; // Convert to percentage
+    if (numRatio >= 200) return 'bg-green-50 border-green-200';
+    if (numRatio >= 150) return 'bg-blue-50 border-blue-200';
+    if (numRatio >= 120) return 'bg-yellow-50 border-yellow-200';
+    if (numRatio >= 110) return 'bg-orange-50 border-orange-200';
+    return 'bg-red-50 border-red-200';
+  };
+
+  if (!isConnected) {
+    return (
+      <div className="p-6 text-center py-12">
+        <Wallet className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">Connect Your Wallet</h3>
+        <p className="text-gray-600">Please connect your wallet to view your positions.</p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-6 text-center py-12">
+        <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Positions...</h3>
+        <p className="text-gray-600">Fetching your loan positions from the blockchain.</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-red-900 mb-2">Error Loading Positions</h3>
+          <p className="text-red-700 mb-4">{error}</p>
+          <button 
+            onClick={refreshPositions}
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (positions.length === 0) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-12">
+          <BarChart3 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">No Active Positions</h3>
+          <p className="text-gray-600 mb-6">You haven't created any loan positions yet.</p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+            <p className="text-blue-800 text-sm">
+              📊 Position management features:
+            </p>
+            <ul className="text-blue-700 text-sm mt-2 text-left space-y-1">
+              <li>• Real-time health monitoring</li>
+              <li>• Add/withdraw collateral</li>
+              <li>• Repay loans</li>
+              <li>• Liquidation alerts</li>
+              <li>• Position history</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
-      <div className="text-center py-12">
-        <BarChart3 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-xl font-semibold text-gray-900 mb-2">No Active Positions</h3>
-        <p className="text-gray-600 mb-6">You haven't created any loan positions yet.</p>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
-          <p className="text-blue-800 text-sm">
-            📊 Position management features:
-          </p>
-          <ul className="text-blue-700 text-sm mt-2 text-left space-y-1">
-            <li>• Real-time health monitoring</li>
-            <li>• Add/withdraw collateral</li>
-            <li>• Repay loans</li>
-            <li>• Liquidation alerts</li>
-            <li>• Position history</li>
-          </ul>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">My Positions</h2>
+          <p className="text-gray-600">Manage your active loan positions</p>
         </div>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={refreshPositions}
+            disabled={isLoading}
+            className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+          <div className="text-sm text-gray-500">
+            {positions.length} position{positions.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+      </div>
+
+      {/* Positions Grid */}
+      <div className="grid gap-6">
+        {positions.map((positionData) => (
+          <div 
+            key={positionData.positionId.toString()} 
+            className={`bg-white rounded-xl shadow-lg border-2 p-6 ${getRiskBgColor(positionData.collateralizationRatio)}`}
+          >
+            {/* Position Header */}
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  Position #{positionData.positionId.toString()}
+                  {positionData.isAtRisk && (
+                    <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
+                      ⚠️ At Risk
+                    </span>
+                  )}
+                </h3>
+                <div className="flex items-center gap-4 mt-1">
+                  <span className="text-sm text-gray-600">
+                    <AssetIcon asset={getAssetSymbol(positionData.position.collateralAsset)} className="w-4 h-4" />
+                    {getAssetSymbol(positionData.position.collateralAsset)} → {getAssetSymbol(positionData.position.loanAsset)}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    Created: {new Date(Number(positionData.position.createdAt) * 1000).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="text-right">
+                <div className={`text-lg font-bold ${getRiskColor(positionData.collateralizationRatio)}`}>
+                  {formatHealthFactor(positionData.collateralizationRatio)}x
+                </div>
+                <div className="text-xs text-gray-500">Health Factor</div>
+              </div>
+            </div>
+
+            {/* Position Metrics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="bg-white p-3 rounded-lg border border-gray-200">
+                <div className="text-xs text-gray-500 mb-1">Collateral</div>
+                <div className="font-semibold text-gray-900">
+                  {parseFloat(positionData.collateralValueFormatted).toFixed(4)} {getAssetSymbol(positionData.position.collateralAsset)}
+                </div>
+              </div>
+              
+              <div className="bg-white p-3 rounded-lg border border-gray-200">
+                <div className="text-xs text-gray-500 mb-1">Borrowed</div>
+                <div className="font-semibold text-gray-900">
+                  {parseFloat(positionData.debtValueFormatted).toFixed(2)} {getAssetSymbol(positionData.position.loanAsset)}
+                </div>
+              </div>
+              
+              <div className="bg-white p-3 rounded-lg border border-gray-200">
+                <div className="text-xs text-gray-500 mb-1">Interest</div>
+                <div className="font-semibold text-gray-900">
+                  {(Number(positionData.accruedInterest) / 1e6).toFixed(4)} {getAssetSymbol(positionData.position.loanAsset)}
+                </div>
+              </div>
+              
+              <div className="bg-white p-3 rounded-lg border border-gray-200">
+                <div className="text-xs text-gray-500 mb-1">LTV Ratio</div>
+                <div className="font-semibold text-gray-900">
+                  {(() => {
+                    // Usar los valores ya formateados del hook
+                    const collateralETH = parseFloat(positionData.collateralValueFormatted)
+                    const debtUSDC = parseFloat(positionData.debtValueFormatted)
+                    
+                    // Precio aproximado ETH = $2500 (mock)
+                    const ethPrice = 2500
+                    const collateralValueUSD = collateralETH * ethPrice
+                    
+                    if (collateralValueUSD === 0) return '0.0%'
+                    
+                    const ltvRatio = (debtUSDC / collateralValueUSD) * 100
+                    return `${ltvRatio.toFixed(1)}%`
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={async () => {
+                  const result = await repayFullPosition(positionData.positionId, positionData.position.loanAsset);
+                  if (result.success) {
+                    console.log('Position repaid successfully:', result.txHash);
+                    refreshPositions();
+                  } else {
+                    console.error('Repayment failed:', result.error);
+                  }
+                }}
+                disabled={isRepaying}
+                className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+              >
+                {isRepaying ? (
+                  <>
+                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                    Repaying...
+                  </>
+                ) : (
+                  <>
+                    <DollarSign className="w-4 h-4" />
+                    Repay Full
+                  </>
+                )}
+              </button>
+              
+              <button
+                onClick={async () => {
+                  const amount = prompt("Enter amount to repay:");
+                  if (amount && !isNaN(Number(amount))) {
+                    const result = await repayPartialPosition(positionData.positionId, positionData.position.loanAsset, BigInt(Math.floor(Number(amount) * 1e6)));
+                    if (result.success) {
+                      console.log('Partial repayment successful:', result.txHash);
+                      refreshPositions();
+                    } else {
+                      console.error('Repayment failed:', result.error);
+                    }
+                  }
+                }}
+                disabled={isRepaying}
+                className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+              >
+                <DollarSign className="w-4 h-4" />
+                Partial Repay
+              </button>
+              
+              <button
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                onClick={() => window.open(`https://sepolia.basescan.org/address/${positionData.position.borrower}`, '_blank')}
+              >
+                <ExternalLink className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
