@@ -45,6 +45,7 @@ function App() {
   const [selectedFeature, setSelectedFeature] = useState(0);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [showApp, setShowApp] = useState(false);
+  const [wasConnected, setWasConnected] = useState(false);
   
   // AppKit hooks
   const { open } = useAppKit();
@@ -82,6 +83,15 @@ function App() {
     }, 3000);
     return () => clearInterval(interval);
   }, [isPlaying]);
+
+  // Auto-launch app when user connects wallet
+  useEffect(() => {
+    // Si el usuario se conecta por primera vez (no estaba conectado antes)
+    if (isConnected && !wasConnected) {
+      setShowApp(true);
+    }
+    setWasConnected(isConnected);
+  }, [isConnected, wasConnected]);
 
   // Animated counter for peso devaluation
   useEffect(() => {
