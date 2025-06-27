@@ -335,9 +335,32 @@ export function useUserPositions() {
           // Calcular health factor
           const healthFactor = calculateHealthFactor(collateralizationRatio)
           
-          // Formatear valores (asumiendo precios mock)
-          const collateralValueFormatted = formatUnits(position.collateralAmount, 18)
-          const debtValueFormatted = formatUnits(totalDebt || 0n, 6) // USDC tiene 6 decimales
+          // 🔧 FIX: Determinar decimales correctos basándose en el tipo de asset
+          const getAssetDecimals = (assetAddress: Address): number => {
+            const addressLower = assetAddress.toLowerCase()
+            if (addressLower === contractAddresses?.mockUSDC?.toLowerCase()) {
+              return 6 // USDC tiene 6 decimales
+            }
+            return 18 // ETH y otros tokens típicamente tienen 18 decimales
+          }
+          
+          // Formatear valores con decimales correctos
+          const collateralDecimals = getAssetDecimals(position.collateralAsset)
+          const loanDecimals = getAssetDecimals(position.loanAsset)
+          
+          const collateralValueFormatted = formatUnits(position.collateralAmount, collateralDecimals)
+          const debtValueFormatted = formatUnits(totalDebt || 0n, loanDecimals)
+
+          console.log(`🔍 Position ${positionId} formatting:`, {
+            collateralAsset: position.collateralAsset,
+            loanAsset: position.loanAsset,
+            collateralDecimals,
+            loanDecimals,
+            collateralRaw: position.collateralAmount.toString(),
+            collateralFormatted: collateralValueFormatted,
+            debtRaw: (totalDebt || 0n).toString(),
+            debtFormatted: debtValueFormatted
+          })
 
           processedPositions.push({
             positionId,
@@ -966,6 +989,11 @@ export function useUserPositions() {
   const isProcessing = isLoading || isLoadingIds || isLoadingData || 
                       isPending || transactionStep !== 'idle'
 
+  // 🔧 FIX: Función helper para obtener símbolo del asset
+  const getAssetSymbolFromAddresses = useCallback((assetAddress: Address): string => {
+    return getAssetSymbol(assetAddress, contractAddresses || undefined)
+  }, [contractAddresses])
+
   return {
     // 📊 Datos
     positions: positionsData,
@@ -979,6 +1007,7 @@ export function useUserPositions() {
     repayFullPosition,
     repayPartialPosition,
     refreshPositions,
+    getAssetSymbol: getAssetSymbolFromAddresses,
     
     // 🔄 Estados de transacciones
     isApproving: transactionStep === 'approving',
@@ -1002,15 +1031,30 @@ function calculateHealthFactor(ratio: bigint): string {
   return healthFactor.toFixed(2)
 }
 
-export function getAssetSymbol(assetAddress: Address): string {
-  const symbolMap: Record<string, string> = {
-    '0x4f34BF3352A701AEc924CE34d6CfC373eABb186c': 'ETH',
-    '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359': 'USDC',
-    '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174': 'USDC.e',
-    '0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FaBad39': 'LINK'
+export function getAssetSymbol(assetAddress: Address, contractAddresses?: ContractAddresses): string {
+  if (!contractAddresses) {
+    // Fallback para direcciones hardcodeadas (compatibilidad)
+    const symbolMap: Record<string, string> = {
+      '0x4f34BF3352A701AEc924CE34d6CfC373eABb186c': 'ETH',
+      '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359': 'USDC',
+      '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174': 'USDC.e',
+      '0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FaBad39': 'LINK'
+    }
+    return symbolMap[assetAddress.toLowerCase()] || 'Unknown'
+  }
+
+  // 🔧 FIX: Usar direcciones dinámicas del contrato
+  const addressLower = assetAddress.toLowerCase()
+  
+  if (addressLower === contractAddresses.mockETH?.toLowerCase()) {
+    return 'ETH'
+  }
+  if (addressLower === contractAddresses.mockUSDC?.toLowerCase()) {
+    return 'USDC'
   }
   
-  return symbolMap[assetAddress.toLowerCase()] || 'Unknown'
+  // Fallback para direcciones no reconocidas
+  return 'Unknown'
 }
 
 export function formatNumber(value: string | number, decimals: number = 2): string {
