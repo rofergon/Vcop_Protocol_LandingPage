@@ -294,12 +294,24 @@ export function useCreatePosition({
         loanAmountBigint = parseUnits(loanAmountStr, loanPrice.decimals)
       }
 
-      // Calcular valores en USD (normalizado a 6 decimales)
-      const collateralValueUSD = (collateralAmountBigint * collateralPrice.price) / BigInt(10 ** collateralPrice.decimals)
-      const loanValueUSD = (loanAmountBigint * loanPrice.price) / BigInt(10 ** loanPrice.decimals)
+      // Calcular valores en USD - CORREGIDO
+      // El oracle MockVCOP siempre devuelve precios con 6 decimales (no depende del token)
+      const ORACLE_DECIMALS = 6
+      const collateralValueUSD = (collateralAmountBigint * collateralPrice.price) / BigInt(10 ** ORACLE_DECIMALS)
+      const loanValueUSD = (loanAmountBigint * loanPrice.price) / BigInt(10 ** ORACLE_DECIMALS)
 
-      // Calcular LTV actual
-      const actualLTV = Number(loanValueUSD * 10000n / collateralValueUSD) / 100
+      // Calcular LTV actual - CORREGIDO
+      // LTV = (loan value / collateral value) * 100
+      const actualLTV = Number(loanValueUSD * 100n / collateralValueUSD)
+
+      console.log('🔍 LTV Calculation Debug:')
+      console.log('  Collateral Amount:', collateralAmountBigint.toString())
+      console.log('  Loan Amount:', loanAmountBigint.toString())
+      console.log('  Collateral Price:', collateralPrice.price.toString())
+      console.log('  Loan Price:', loanPrice.price.toString())
+      console.log('  Collateral Value USD:', collateralValueUSD.toString())
+      console.log('  Loan Value USD:', loanValueUSD.toString())
+      console.log('  Calculated LTV:', actualLTV.toFixed(2) + '%')
 
       // Determinar nivel de riesgo
       let riskLevel: 'low' | 'medium' | 'high' | 'extreme'
