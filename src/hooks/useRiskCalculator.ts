@@ -34,6 +34,14 @@ const ASSET_VOLATILITY = {
   'VCOP': 0.02,   // 2%
 } as const;
 
+// 🔧 FIX: Asset decimals configuration
+const ASSET_DECIMALS = {
+  'ETH': 18,
+  'WBTC': 8,      // Bitcoin typically uses 8 decimals
+  'USDC': 6,      // USDC uses 6 decimals (CRITICAL FIX)
+  'VCOP': 18,
+} as const;
+
 // Asset configurations - These are SUGGESTIONS ONLY (not enforced by FlexibleAssetHandler)
 const ASSET_SUGGESTIONS = {
   'ETH': {
@@ -100,16 +108,39 @@ export function useRiskCalculator(position: Partial<LoanPosition>) {
     
     if (!collateralSymbol || !loanSymbol) return null;
 
-    // Calculate values in USD
-    const collateralAmountNum = parseFloat(position.collateralAmount);
-    const loanAmountNum = parseFloat(position.loanAmount);
+    // 🔧 FIX: Normalize amounts by decimals before calculation
+    const collateralDecimals = ASSET_DECIMALS[collateralSymbol as keyof typeof ASSET_DECIMALS] || 18;
+    const loanDecimals = ASSET_DECIMALS[loanSymbol as keyof typeof ASSET_DECIMALS] || 18;
+    
+    // Convert from raw blockchain amounts to human-readable amounts
+    const collateralAmountNum = parseFloat(position.collateralAmount) / Math.pow(10, collateralDecimals);
+    const loanAmountNum = parseFloat(position.loanAmount) / Math.pow(10, loanDecimals);
     const interestRate = parseFloat(position.interestRate || '5');
+
+    console.log('🔍 Risk Calculator Debug:', {
+      collateralSymbol,
+      loanSymbol,
+      collateralDecimals,
+      loanDecimals,
+      collateralAmountRaw: position.collateralAmount,
+      loanAmountRaw: position.loanAmount,
+      collateralAmountNormalized: collateralAmountNum,
+      loanAmountNormalized: loanAmountNum
+    });
 
     const collateralPrice = MOCK_PRICES[collateralSymbol as keyof typeof MOCK_PRICES];
     const loanPrice = MOCK_PRICES[loanSymbol as keyof typeof MOCK_PRICES];
 
     const collateralValue = collateralAmountNum * collateralPrice;
     const loanValue = loanAmountNum * loanPrice;
+
+    console.log('🔍 Value Calculation Debug:', {
+      collateralPrice,
+      loanPrice,
+      collateralValue,
+      loanValue,
+      ltv: loanValue / collateralValue * 100
+    });
 
     if (loanValue === 0) return null;
 
