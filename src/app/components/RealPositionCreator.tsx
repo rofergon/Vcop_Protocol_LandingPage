@@ -27,6 +27,7 @@ import type { LoanTerms, CreatePositionParams } from '../../hooks/useCreatePosit
 import useContractAddresses from '../../hooks/useContractAddresses';
 import { parseUnits } from 'viem';
 import MockETHFaucet from './MockETHFaucet';
+import { useOraclePrices } from '../../hooks/useOraclePrices';
 
 // Asset icon component
 const AssetIcon: React.FC<{ asset: string; className?: string }> = ({ asset, className = "w-5 h-5" }) => {
@@ -219,7 +220,17 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
     { name: "Extreme", ltv: 95, description: "Maximum leverage", color: "orange" }
   ];
 
-  const assetPrices = { ETH: 2500, WBTC: 45000, USDC: 1, VCOP: 1/4100 };
+  // 🔍 INTEGRACIÓN CON ORACLE: Obtener precios dinámicos del MockVCOPOracle desplegado
+  const { 
+    prices: oraclePrices, 
+    isLoading: pricesLoading, 
+    error: pricesError, 
+    refetchPrices, 
+    lastUpdated 
+  } = useOraclePrices();
+  
+  // Usar precios del oracle en lugar de hardcodeados
+  const assetPrices = oraclePrices;
 
   const handleCreatePosition = async () => {
     if (!isConnected || !addresses) return;
@@ -307,7 +318,31 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
     return (collateralValue * easyLTV / 100) / assetPrices[loanAsset as keyof typeof assetPrices];
   };
 
-  const currentLTV = parseFloat(isEasyMode ? calculateLoanFromLTV().toString() : loanAmount) * assetPrices[loanAsset as keyof typeof assetPrices] / (parseFloat(isEasyMode ? easyCollateralAmount.toString() : collateralAmount) * assetPrices[collateralAsset as keyof typeof assetPrices]) * 100;
+  // 🔧 FIX: Consider asset decimals for accurate LTV calculation
+  const getAssetDecimals = (asset: string): number => {
+    if (asset === 'USDC') return 6;
+    if (asset === 'WBTC') return 8;
+    return 18; // ETH, VCOP default
+  };
+
+  const calculateCurrentLTV = () => {
+    const collateralAmountValue = parseFloat(isEasyMode ? easyCollateralAmount.toString() : collateralAmount);
+    const loanAmountValue = parseFloat(isEasyMode ? calculateLoanFromLTV().toString() : loanAmount);
+    
+    // Get prices
+    const collateralPrice = assetPrices[collateralAsset as keyof typeof assetPrices];
+    const loanPrice = assetPrices[loanAsset as keyof typeof assetPrices];
+    
+    // Calculate values in USD
+    const collateralValueUSD = collateralAmountValue * collateralPrice;
+    const loanValueUSD = loanAmountValue * loanPrice;
+    
+    if (collateralValueUSD === 0) return 0;
+    
+    return (loanValueUSD / collateralValueUSD) * 100;
+  };
+
+  const currentLTV = calculateCurrentLTV();
   
   // Calculate risk metrics based on current LTV
   const riskLevel = calculateRiskLevel(isEasyMode ? easyLTV : currentLTV);
@@ -599,6 +634,68 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                     </button>
                   </div>
                 )}
+
+                {/* Oracle Price Display */}
+                <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-lg p-3 border border-cyan-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <h5 className="font-semibold text-cyan-900 flex items-center gap-2">
+                      <Activity className="w-4 h-4" />
+                      🔮 Oracle Prices
+                    </h5>
+                    <div className="flex items-center gap-2">
+                      {pricesError && (
+                        <span className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded-full">
+                          ⚠️ Error
+                        </span>
+                      )}
+                      {pricesLoading && (
+                        <div className="animate-spin w-3 h-3 border border-cyan-500 border-t-transparent rounded-full"></div>
+                      )}
+                      <button 
+                        onClick={refetchPrices}
+                        className="text-xs text-cyan-600 hover:text-cyan-800 bg-cyan-100 hover:bg-cyan-200 px-2 py-1 rounded-full transition-colors"
+                      >
+                        🔄
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className="text-sm font-bold text-gray-900">
+                        ${assetPrices.ETH.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-gray-600">ETH</div>
+                    </div>
+                    
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className="text-sm font-bold text-gray-900">
+                        ${assetPrices.WBTC.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-gray-600">WBTC</div>
+                    </div>
+                    
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className="text-sm font-bold text-gray-900">
+                        ${assetPrices.USDC.toFixed(2)}
+                      </div>
+                      <div className="text-xs text-gray-600">USDC</div>
+                    </div>
+                    
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className="text-sm font-bold text-gray-900">
+                        ${assetPrices.VCOP.toFixed(6)}
+                      </div>
+                      <div className="text-xs text-gray-600">VCOP</div>
+                    </div>
+                  </div>
+                  
+                  {lastUpdated && (
+                    <div className="text-xs text-cyan-700 mt-2 text-center">
+                      Updated: {lastUpdated.toLocaleTimeString()}
+                    </div>
+                  )}
+                </div>
 
                 {/* DEBUG DISPLAY */}
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs">
