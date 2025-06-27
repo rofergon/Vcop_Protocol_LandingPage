@@ -7,9 +7,11 @@ import {
   AlertTriangle,
   Shield,
   Activity,
-  Target
+  Target,
+  RefreshCw
 } from 'lucide-react';
 import { RiskLevel } from '../../hooks/useRiskCalculator';
+import { useOraclePrices } from '../../hooks/useOraclePrices';
 
 interface RiskMetrics {
   riskLevel: RiskLevel;
@@ -74,6 +76,14 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
   getRiskLevelColor,
   getRiskLevelBgColor
 }) => {
+  // 🔍 INTEGRACIÓN CON ORACLE: Obtener precios dinámicos
+  const { 
+    prices: oraclePrices, 
+    isLoading: pricesLoading, 
+    error: pricesError, 
+    refetchPrices, 
+    lastUpdated 
+  } = useOraclePrices();
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
       {/* Header */}
@@ -111,7 +121,7 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
           </div>
         </div>
 
-        {/* Liquidation Info */}
+        {/* Liquidation Info with Oracle Prices */}
         <div className="bg-red-50 p-4 rounded-lg border border-red-200">
           <h4 className="font-semibold text-red-900 mb-2 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" />
@@ -127,11 +137,30 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
             </div>
             
             <div className="flex justify-between items-center">
+              <span className="text-sm text-red-700">Current Price:</span>
+              <span className="font-bold text-gray-900">
+                ${oraclePrices[collateralAsset as keyof typeof oraclePrices]?.toLocaleString() || 'Loading...'}
+              </span>
+            </div>
+            
+            <div className="flex justify-between items-center">
               <span className="text-sm text-red-700">Price Drop to Liquidation:</span>
               <span className="font-bold text-red-900">
                 -{riskMetrics.priceDropToSuggestedLiquidation.toFixed(1)}%
               </span>
             </div>
+            
+            {/* Real-time price difference */}
+            {oraclePrices[collateralAsset as keyof typeof oraclePrices] && (
+              <div className="mt-2 pt-2 border-t border-red-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-red-600">Safety Margin:</span>
+                  <span className="font-bold text-red-800">
+                    ${(oraclePrices[collateralAsset as keyof typeof oraclePrices] - riskMetrics.theoreticalLiquidationPrice).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -211,6 +240,57 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
             </div>
           </div>
         )}
+
+        {/* Oracle Prices Display */}
+        <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-lg p-3 border border-cyan-200">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="font-semibold text-cyan-900 text-sm flex items-center gap-2">
+              <Activity className="w-4 h-4" />
+              🔮 Current Prices
+            </h4>
+            <div className="flex items-center gap-2">
+              {pricesError && (
+                <span className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded-full">
+                  ⚠️
+                </span>
+              )}
+              {pricesLoading && (
+                <div className="animate-spin w-3 h-3 border border-cyan-500 border-t-transparent rounded-full"></div>
+              )}
+              <button 
+                onClick={refetchPrices}
+                className="text-xs text-cyan-600 hover:text-cyan-800 bg-cyan-100 hover:bg-cyan-200 px-2 py-1 rounded-full transition-colors"
+                title="Refresh prices"
+              >
+                <RefreshCw className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-2">
+            <div className="text-center bg-white p-2 rounded-lg">
+              <div className="text-sm font-bold text-gray-900 flex items-center justify-center gap-1">
+                <AssetIcon asset={collateralAsset} className="w-4 h-4" />
+                ${oraclePrices[collateralAsset as keyof typeof oraclePrices]?.toLocaleString() || 'N/A'}
+              </div>
+              <div className="text-xs text-gray-600">{collateralAsset}</div>
+            </div>
+            
+            <div className="text-center bg-white p-2 rounded-lg">
+              <div className="text-sm font-bold text-gray-900 flex items-center justify-center gap-1">
+                <AssetIcon asset={loanAsset} className="w-4 h-4" />
+                ${oraclePrices[loanAsset as keyof typeof oraclePrices]?.toLocaleString() || 'N/A'}
+              </div>
+              <div className="text-xs text-gray-600">{loanAsset}</div>
+            </div>
+          </div>
+          
+          {lastUpdated && (
+            <div className="text-xs text-cyan-700 mt-2 text-center">
+              Updated: {lastUpdated.toLocaleTimeString()}
+            </div>
+          )}
+        </div>
 
         {/* VCOP Protocol Info */}
         <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-4 rounded-lg border border-emerald-200">
