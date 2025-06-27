@@ -30,6 +30,7 @@ import { parseUnits, formatUnits, type Address } from 'viem';
 import MockETHFaucet from './components/MockETHFaucet';
 import { useUserPositions } from '../hooks/useUserPositions';
 import DebugPositions from './components/DebugPositions';
+import { useOraclePrices } from '../hooks/useOraclePrices';
 
 // Asset icon component con iconos de /public
 const AssetIcon: React.FC<{ asset: string; className?: string }> = ({ asset, className = "w-5 h-5" }) => {
@@ -265,7 +266,17 @@ const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnected }) 
     { name: "Extreme", ltv: 95, description: "Maximum leverage", color: "orange" }
   ];
 
-  const assetPrices = { ETH: 2500, WBTC: 45000, USDC: 1, VCOP: 1/4100 };
+  // 🔍 INTEGRACIÓN CON ORACLE: Obtener precios dinámicos del MockVCOPOracle desplegado
+  const { 
+    prices: oraclePrices, 
+    isLoading: pricesLoading, 
+    error: pricesError, 
+    refetchPrices, 
+    lastUpdated 
+  } = useOraclePrices();
+  
+  // Usar precios del oracle en lugar de hardcodeados
+  const assetPrices = oraclePrices;
 
   const handleCreatePosition = async () => {
     if (!isConnected || !addresses) return;
@@ -326,7 +337,25 @@ const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnected }) 
     return (collateralValue * easyLTV / 100) / assetPrices[loanAsset as keyof typeof assetPrices];
   };
 
-  const currentLTV = parseFloat(isEasyMode ? calculateLoanFromLTV().toString() : loanAmount) * assetPrices[loanAsset as keyof typeof assetPrices] / (parseFloat(isEasyMode ? easyCollateralAmount.toString() : collateralAmount) * assetPrices[collateralAsset as keyof typeof assetPrices]) * 100;
+  // 🔧 FIX: Consider asset decimals for accurate LTV calculation
+  const calculateCurrentLTV = () => {
+    const collateralAmountValue = parseFloat(isEasyMode ? easyCollateralAmount.toString() : collateralAmount);
+    const loanAmountValue = parseFloat(isEasyMode ? calculateLoanFromLTV().toString() : loanAmount);
+    
+    // Get prices
+    const collateralPrice = assetPrices[collateralAsset as keyof typeof assetPrices];
+    const loanPrice = assetPrices[loanAsset as keyof typeof assetPrices];
+    
+    // Calculate values in USD
+    const collateralValueUSD = collateralAmountValue * collateralPrice;
+    const loanValueUSD = loanAmountValue * loanPrice;
+    
+    if (collateralValueUSD === 0) return 0;
+    
+    return (loanValueUSD / collateralValueUSD) * 100;
+  };
+
+  const currentLTV = calculateCurrentLTV();
   
   // Calculate risk metrics based on current LTV
   const riskLevel = calculateRiskLevel(isEasyMode ? easyLTV : currentLTV);
@@ -537,36 +566,98 @@ const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnected }) 
                   </div>
                 </div>
 
-                                 {/* Real-time Feedback */}
-                 <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 border border-purple-200">
-                   <h5 className="font-semibold text-purple-900 mb-2 flex items-center gap-2">
-                     <BarChart3 className="w-4 h-4" />
-                     📊 Live Metrics
-                   </h5>
-                   
-                   <div className="grid grid-cols-3 gap-2">
-                     <div className="text-center bg-white p-2 rounded-lg">
-                       <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${getRiskLevelBgColor(riskLevel)} ${getRiskLevelColor(riskLevel)}`}>
-                         {getRiskIcon(riskLevel)}
-                       </div>
-                       <div className="text-xs text-gray-600 mt-1">Risk</div>
-                     </div>
-                     
-                     <div className="text-center bg-white p-2 rounded-lg">
-                       <div className="text-sm font-bold text-gray-900">
-                         {healthFactor}
-                       </div>
-                       <div className="text-xs text-gray-600">Health</div>
-                     </div>
-                     
-                     <div className="text-center bg-white p-2 rounded-lg">
-                       <div className="text-sm font-bold text-gray-900">
-                         {(isEasyMode ? easyLTV : currentLTV).toFixed(1)}%
-                       </div>
-                       <div className="text-xs text-gray-600">LTV</div>
-                     </div>
-                   </div>
-                 </div>
+                                                 {/* Oracle Price Display */}
+                <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-lg p-3 border border-cyan-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <h5 className="font-semibold text-cyan-900 flex items-center gap-2">
+                      <Activity className="w-4 h-4" />
+                      🔮 Oracle Prices
+                    </h5>
+                    <div className="flex items-center gap-2">
+                      {pricesError && (
+                        <span className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded-full">
+                          ⚠️ Error
+                        </span>
+                      )}
+                      {pricesLoading && (
+                        <div className="animate-spin w-3 h-3 border border-cyan-500 border-t-transparent rounded-full"></div>
+                      )}
+                      <button 
+                        onClick={refetchPrices}
+                        className="text-xs text-cyan-600 hover:text-cyan-800 bg-cyan-100 hover:bg-cyan-200 px-2 py-1 rounded-full transition-colors"
+                      >
+                        🔄
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className="text-sm font-bold text-gray-900">
+                        ${assetPrices.ETH.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-gray-600">ETH</div>
+                    </div>
+                    
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className="text-sm font-bold text-gray-900">
+                        ${assetPrices.WBTC.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-gray-600">WBTC</div>
+                    </div>
+                    
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className="text-sm font-bold text-gray-900">
+                        ${assetPrices.USDC.toFixed(2)}
+                      </div>
+                      <div className="text-xs text-gray-600">USDC</div>
+                    </div>
+                    
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className="text-sm font-bold text-gray-900">
+                        ${assetPrices.VCOP.toFixed(6)}
+                      </div>
+                      <div className="text-xs text-gray-600">VCOP</div>
+                    </div>
+                  </div>
+                  
+                  {lastUpdated && (
+                    <div className="text-xs text-cyan-700 mt-2 text-center">
+                      Updated: {lastUpdated.toLocaleTimeString()}
+                    </div>
+                  )}
+                </div>
+
+                {/* Real-time Feedback */}
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 border border-purple-200">
+                  <h5 className="font-semibold text-purple-900 mb-2 flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4" />
+                    📊 Live Metrics
+                  </h5>
+                  
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${getRiskLevelBgColor(riskLevel)} ${getRiskLevelColor(riskLevel)}`}>
+                        {getRiskIcon(riskLevel)}
+                      </div>
+                      <div className="text-xs text-gray-600 mt-1">Risk</div>
+                    </div>
+                    
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className="text-sm font-bold text-gray-900">
+                        {healthFactor}
+                      </div>
+                      <div className="text-xs text-gray-600">Health</div>
+                    </div>
+                    
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className="text-sm font-bold text-gray-900">
+                        {(isEasyMode ? easyLTV : currentLTV).toFixed(1)}%
+                      </div>
+                      <div className="text-xs text-gray-600">LTV</div>
+                    </div>
+                  </div>
+                </div>
 
                  {/* Balance Information */}
                  {balanceInfo.eth && balanceInfo.usdc && (
@@ -813,6 +904,9 @@ const MyPositionsTab: React.FC = () => {
     txError,
     getAssetSymbol: getAssetSymbolFromPositions
   } = useUserPositions();
+  
+  // 🔧 FIX: Usar precios dinámicos del oracle
+  const { prices: oraclePrices } = useOraclePrices();
 
   // 🔧 FIX: Usar la función getAssetSymbol del hook useUserPositions que tiene las direcciones correctas
   const getAssetSymbol = (assetAddress: string): string => {
@@ -1042,18 +1136,74 @@ const MyPositionsTab: React.FC = () => {
                 <div className="text-xs text-gray-500 mb-1">LTV Ratio</div>
                 <div className="font-semibold text-gray-900">
                   {(() => {
-                    // Usar los valores ya formateados del hook
-                    const collateralETH = parseFloat(positionData.collateralValueFormatted)
-                    const debtUSDC = parseFloat(positionData.debtValueFormatted)
+                    // 🔧 FIX: Calcular LTV correctamente usando precios del oracle y decimales correctos
+                    const collateralSymbol = getAssetSymbol(positionData.position.collateralAsset);
+                    const loanSymbol = getAssetSymbol(positionData.position.loanAsset);
                     
-                    // Precio aproximado ETH = $2500 (mock)
-                    const ethPrice = 2500
-                    const collateralValueUSD = collateralETH * ethPrice
+                    console.log('🔍 LTV Calculation Debug:', {
+                      positionId: positionData.positionId.toString(),
+                      collateralSymbol,
+                      loanSymbol,
+                      collateralValueFormatted: positionData.collateralValueFormatted,
+                      debtValueFormatted: positionData.debtValueFormatted,
+                      oraclePrices
+                    });
                     
-                    if (collateralValueUSD === 0) return '0.0%'
+                    // Obtener cantidades ya normalizadas (el hook useUserPositions ya las normaliza por decimales)
+                    const collateralAmount = parseFloat(positionData.collateralValueFormatted);
+                    const loanAmount = parseFloat(positionData.debtValueFormatted);
                     
-                    const ltvRatio = (debtUSDC / collateralValueUSD) * 100
-                    return `${ltvRatio.toFixed(1)}%`
+                    // Obtener precios del oracle según el símbolo del asset
+                    let collateralPrice = 1; // Default
+                    let loanPrice = 1; // Default
+                    
+                    switch (collateralSymbol) {
+                      case 'ETH':
+                        collateralPrice = oraclePrices.ETH;
+                        break;
+                      case 'WBTC':
+                        collateralPrice = oraclePrices.WBTC;
+                        break;
+                      case 'USDC':
+                        collateralPrice = oraclePrices.USDC; // Siempre $1
+                        break;
+                      case 'VCOP':
+                        collateralPrice = oraclePrices.VCOP;
+                        break;
+                    }
+                    
+                    switch (loanSymbol) {
+                      case 'ETH':
+                        loanPrice = oraclePrices.ETH;
+                        break;
+                      case 'WBTC':
+                        loanPrice = oraclePrices.WBTC;
+                        break;
+                      case 'USDC':
+                        loanPrice = oraclePrices.USDC; // Siempre $1
+                        break;
+                      case 'VCOP':
+                        loanPrice = oraclePrices.VCOP;
+                        break;
+                    }
+                    
+                    // Calcular valores en USD
+                    const collateralValueUSD = collateralAmount * collateralPrice;
+                    const loanValueUSD = loanAmount * loanPrice;
+                    
+                    console.log('💰 Value Calculation:', {
+                      collateralAmount,
+                      loanAmount,
+                      collateralPrice,
+                      loanPrice,
+                      collateralValueUSD,
+                      loanValueUSD
+                    });
+                    
+                    if (collateralValueUSD === 0) return '0.0%';
+                    
+                    const ltvRatio = (loanValueUSD / collateralValueUSD) * 100;
+                    return `${ltvRatio.toFixed(1)}%`;
                   })()}
                 </div>
               </div>
