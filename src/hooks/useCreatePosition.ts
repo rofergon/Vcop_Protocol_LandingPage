@@ -364,6 +364,11 @@ export function useCreatePosition({
     // Obtener decimales del asset de collateral
     const isETH = collateralAsset === addresses.mockETH
     const isUSDC = collateralAsset === addresses.mockUSDC
+    
+    console.log('🔍 checkBalances - collateralAsset:', collateralAsset)
+    console.log('🔍 checkBalances - addresses.mockETH:', addresses.mockETH)  
+    console.log('🔍 checkBalances - addresses.mockUSDC:', addresses.mockUSDC)
+    console.log('🔍 checkBalances - isETH:', isETH, 'isUSDC:', isUSDC)
 
     const decimals = isETH ? 18 : isUSDC ? 6 : 18
     
@@ -384,7 +389,7 @@ export function useCreatePosition({
       console.log('🔍 checkBalances - convirtiendo string:', collateralAmountStr, 'a wei:', collateralAmountBigint.toString())
     }
     
-    // Solo validar balance del asset de COLLATERAL
+    // Validar balance del asset de COLLATERAL específico
     if (isETH) {
       if (!ethBalance) {
         return { valid: false, message: 'ETH balance not loaded' }
@@ -403,11 +408,16 @@ export function useCreatePosition({
       }
       
       if (usdcBalance.value < collateralAmountBigint) {
+        console.log('🚨 Balance check failed - displayAmount:', displayAmount, 'collateralAmountBigint:', collateralAmountBigint.toString())
         return {
           valid: false,
           message: `Need ${displayAmount} USDC for collateral, have ${formatUnits(usdcBalance.value, 6)} USDC`
         }
       }
+    } else {
+      // Para otros assets, solo advertir que no podemos verificar balance
+      console.log('⚠️ Cannot verify balance for unknown collateral asset:', collateralAsset)
+      return { valid: true, message: 'Balance check skipped for unknown asset' }
     }
     
     return { valid: true, message: 'Collateral balance sufficient' }

@@ -24,7 +24,7 @@ import {
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { useAppKit } from '@reown/appkit/react';
 import { useCreatePosition } from '../hooks/useCreatePosition';
-import type { LoanTerms } from '../hooks/useCreatePosition';
+import type { LoanTerms, CreatePositionParams } from '../hooks/useCreatePosition';
 import useContractAddresses from '../hooks/useContractAddresses';
 import { parseUnits, formatUnits } from 'viem';
 import MockETHFaucet from './components/MockETHFaucet';
@@ -269,33 +269,52 @@ const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnected }) 
   const assetPrices = { ETH: 2500, WBTC: 45000, USDC: 1, VCOP: 1/4100 };
 
   const handleCreatePosition = async () => {
-    if (!isConnected) return;
+    if (!isConnected || !addresses) return;
     
     try {
-      // Preparar términos del préstamo
-      const collateralAmountBigInt = parseUnits(
-        isEasyMode ? easyCollateralAmount.toString() : collateralAmount, 
-        18
-      );
-      const loanAmountBigInt = parseUnits(
-        isEasyMode ? calculateLoanFromLTV().toString() : loanAmount, 
-        6
-      );
-      
-      if (!addresses?.mockETH || !addresses?.mockUSDC) {
-        console.error('Contract addresses not loaded yet');
-        return;
-      }
+      // 🔍 Mapear assets seleccionados a direcciones de contratos
+      const getAssetAddress = (asset: string) => {
+        console.log('🔍 Mapping asset:', asset, 'to address');
+        switch (asset.toUpperCase()) {
+          case 'ETH': 
+            console.log('  → ETH mapped to:', addresses.mockETH);
+            return addresses.mockETH;
+          case 'USDC': 
+            console.log('  → USDC mapped to:', addresses.mockUSDC);
+            return addresses.mockUSDC;
+          case 'WBTC': 
+            console.log('  → WBTC mapped to:', addresses.mockWBTC);
+            return addresses.mockWBTC;
+          case 'VCOP': 
+            console.log('  → VCOP mapped to USDC:', addresses.mockUSDC);
+            return addresses.mockUSDC; // VCOP no existe, usar USDC
+          default: 
+            console.log('  → Default mapped to ETH:', addresses.mockETH);
+            return addresses.mockETH;
+        }
+      };
 
-      const customTerms: Partial<LoanTerms> = {
-        collateralAsset: addresses.mockETH,
-        loanAsset: addresses.mockUSDC,
-        collateralAmount: collateralAmountBigInt,
-        loanAmount: loanAmountBigInt,
-        maxLoanToValue: BigInt((isEasyMode ? easyLTV : currentLTV) * 10000), // Convert to basis points
-        interestRate: 80000n, // 8% APR
+      // Preparar cantidades en formato string (no BigInt)
+      const collateralAmountStr = isEasyMode ? easyCollateralAmount.toString() : collateralAmount;
+      const loanAmountStr = isEasyMode ? calculateLoanFromLTV().toString() : loanAmount;
+      
+      const customTerms: CreatePositionParams = {
+        collateralAsset: getAssetAddress(collateralAsset),
+        loanAsset: getAssetAddress(loanAsset),
+        collateralAmount: collateralAmountStr,
+        loanAmount: loanAmountStr,
+        maxLoanToValue: isEasyMode ? easyLTV : currentLTV,
+        interestRate: 8, // 8% APR
         duration: 0n // Perpetual
       };
+
+      console.log('🚀 Creating position with user selections:', {
+        collateral: collateralAsset,
+        loan: loanAsset,
+        collateralAddress: customTerms.collateralAsset,
+        loanAddress: customTerms.loanAsset,
+        terms: customTerms
+      });
 
       await createPosition(customTerms);
     } catch (error) {

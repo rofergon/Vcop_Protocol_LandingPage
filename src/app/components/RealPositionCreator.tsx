@@ -22,8 +22,9 @@ import {
 } from 'lucide-react';
 import { useAccount } from 'wagmi';
 import { useAppKit } from '@reown/appkit/react';
-import { useCreatePosition, BASE_SEPOLIA_ADDRESSES } from '../../hooks/useCreatePosition';
-import type { LoanTerms } from '../../hooks/useCreatePosition';
+import { useCreatePosition } from '../../hooks/useCreatePosition';
+import type { LoanTerms, CreatePositionParams } from '../../hooks/useCreatePosition';
+import useContractAddresses from '../../hooks/useContractAddresses';
 import { parseUnits } from 'viem';
 import MockETHFaucet from './MockETHFaucet';
 
@@ -193,6 +194,9 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
   const { isConnected } = useAccount();
   const { open } = useAppKit();
 
+  // Hook para direcciones de contratos
+  const { addresses } = useContractAddresses();
+
   // Hook para crear posiciones
   const {
     createPosition,
@@ -203,10 +207,8 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
     txHash,
     step,
     balanceInfo,
-    allowanceInfo,
     refetchBalances
   } = useCreatePosition({
-    addresses: BASE_SEPOLIA_ADDRESSES,
     autoVerifyBalances: true
   });
 
@@ -220,28 +222,79 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
   const assetPrices = { ETH: 2500, WBTC: 45000, USDC: 1, VCOP: 1/4100 };
 
   const handleCreatePosition = async () => {
-    if (!isConnected) return;
+    if (!isConnected || !addresses) return;
+    
+    // 🔍 DEBUG: Verificar valores de estado antes de crear la posición
+    console.log('🔍 DEBUG - Estado actual:', {
+      isEasyMode,
+      collateralAsset,
+      loanAsset,
+      collateralAmount,
+      loanAmount,
+      easyCollateralAmount,
+      easyLTV,
+      addresses: {
+        mockETH: addresses.mockETH,
+        mockUSDC: addresses.mockUSDC,
+        mockWBTC: addresses.mockWBTC
+      }
+    });
     
     try {
-      // Preparar términos del préstamo
-      const collateralAmountBigInt = parseUnits(
-        isEasyMode ? easyCollateralAmount.toString() : collateralAmount, 
-        18
-      );
-      const loanAmountBigInt = parseUnits(
-        isEasyMode ? calculateLoanFromLTV().toString() : loanAmount, 
-        6
-      );
+      // Mapear assets seleccionados a direcciones de contratos
+      const getAssetAddress = (asset: string) => {
+        console.log('🔍 Mapping asset:', asset, 'to address');
+        switch (asset.toUpperCase()) {
+          case 'ETH': 
+            console.log('  → ETH mapped to:', addresses.mockETH);
+            return addresses.mockETH;
+          case 'USDC': 
+            console.log('  → USDC mapped to:', addresses.mockUSDC);
+            return addresses.mockUSDC;
+          case 'WBTC': 
+            console.log('  → WBTC mapped to:', addresses.mockWBTC);
+            return addresses.mockWBTC;
+          case 'VCOP': 
+            console.log('  → VCOP mapped to USDC:', addresses.mockUSDC);
+            return addresses.mockUSDC; // VCOP no existe, usar USDC
+          default: 
+            console.log('  → Default mapped to ETH:', addresses.mockETH);
+            return addresses.mockETH;
+        }
+      };
+
+      // Obtener decimales por asset
+      const getAssetDecimals = (asset: string) => {
+        switch (asset.toUpperCase()) {
+          case 'ETH': return 18;
+          case 'WBTC': return 8;
+          case 'USDC': return 6;
+          case 'VCOP': return 6; // Asumir 6 decimales
+          default: return 18;
+        }
+      };
+
+      // Preparar cantidades en formato string (no BigInt)
+      const collateralAmountStr = isEasyMode ? easyCollateralAmount.toString() : collateralAmount;
+      const loanAmountStr = isEasyMode ? calculateLoanFromLTV().toString() : loanAmount;
       
-      const customTerms: Partial<LoanTerms> = {
-        collateralAsset: BASE_SEPOLIA_ADDRESSES.mockETH,
-        loanAsset: BASE_SEPOLIA_ADDRESSES.mockUSDC,
-        collateralAmount: collateralAmountBigInt,
-        loanAmount: loanAmountBigInt,
-        maxLoanToValue: BigInt((isEasyMode ? easyLTV : currentLTV) * 10000), // Convert to basis points
-        interestRate: 80000n, // 8% APR
+      const customTerms: CreatePositionParams = {
+        collateralAsset: getAssetAddress(collateralAsset),
+        loanAsset: getAssetAddress(loanAsset),
+        collateralAmount: collateralAmountStr,
+        loanAmount: loanAmountStr,
+        maxLoanToValue: isEasyMode ? easyLTV : currentLTV,
+        interestRate: 8, // 8% APR
         duration: 0n // Perpetual
       };
+
+      console.log('🚀 Creating position with user selections:', {
+        collateral: collateralAsset,
+        loan: loanAsset,
+        collateralAddress: customTerms.collateralAsset,
+        loanAddress: customTerms.loanAsset,
+        terms: customTerms
+      });
 
       await createPosition(customTerms);
     } catch (error) {
@@ -399,16 +452,19 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                     </h5>
                     
                     <div className="space-y-3">
-                      <AssetDropdown
-                        value={collateralAsset}
-                        onChange={setCollateralAsset}
-                        options={[
-                          { value: "ETH", label: "ETH" },
-                          { value: "WBTC", label: "WBTC" },
-                          { value: "USDC", label: "USDC" }
-                        ]}
-                        borderColor="border-blue-300"
-                      />
+                                          <AssetDropdown
+                      value={collateralAsset}
+                      onChange={(value) => {
+                        console.log('🔍 Collateral asset changed to:', value);
+                        setCollateralAsset(value);
+                      }}
+                      options={[
+                        { value: "ETH", label: "ETH" },
+                        { value: "WBTC", label: "WBTC" },
+                        { value: "USDC", label: "USDC" }
+                      ]}
+                      borderColor="border-blue-300"
+                    />
                       
                       <div className="relative">
                         <input
@@ -444,7 +500,10 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                     <div className="space-y-2">
                       <AssetDropdown
                         value={loanAsset}
-                        onChange={setLoanAsset}
+                        onChange={(value) => {
+                          console.log('🔍 Loan asset changed to:', value);
+                          setLoanAsset(value);
+                        }}
                         options={[
                           { value: "USDC", label: "USDC" },
                           { value: "VCOP", label: "VCOP" },
@@ -540,6 +599,17 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                     </button>
                   </div>
                 )}
+
+                {/* DEBUG DISPLAY */}
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs">
+                  <h6 className="font-semibold text-yellow-800 mb-1">🔍 Debug Info</h6>
+                  <div className="grid grid-cols-2 gap-2 text-yellow-700">
+                    <div>Collateral Asset: <strong>{collateralAsset}</strong></div>
+                    <div>Loan Asset: <strong>{loanAsset}</strong></div>
+                    <div>Collateral Amount: <strong>{isEasyMode ? easyCollateralAmount : collateralAmount}</strong></div>
+                    <div>Loan Amount: <strong>{isEasyMode ? calculateLoanFromLTV().toFixed(4) : loanAmount}</strong></div>
+                  </div>
+                </div>
 
                 {/* Error Display */}
                 {error && (
