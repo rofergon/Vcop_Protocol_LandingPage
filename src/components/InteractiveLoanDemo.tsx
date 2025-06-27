@@ -24,6 +24,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { useRiskCalculator, RiskLevel } from '../hooks/useRiskCalculator';
+import { useOraclePrices } from '../hooks/useOraclePrices';
 
 interface InteractiveLoanDemoProps {
   className?: string;
@@ -184,13 +185,17 @@ export const InteractiveLoanDemo: React.FC<InteractiveLoanDemoProps> = ({ classN
 
   const { riskMetrics, priceImpact, formatCollateralizationRatio, formatHealthFactor, getRiskLevelColor, getRiskLevelBgColor } = useRiskCalculator(customPosition);
 
-  // Asset prices for calculations (all in USD)
-  const assetPrices = {
-    ETH: 2500,
-    WBTC: 45000,
-    USDC: 1,
-    VCOP: 1/4100  // 1 VCOP = 1 COP = ~1/4100 USD
-  };
+  // 🔍 INTEGRACIÓN CON ORACLE: Obtener precios dinámicos del MockVCOPOracle desplegado
+  const { 
+    prices: oraclePrices, 
+    isLoading: pricesLoading, 
+    error: pricesError, 
+    refetchPrices, 
+    lastUpdated 
+  } = useOraclePrices();
+  
+  // Usar precios del oracle en lugar de hardcodeados
+  const assetPrices = oraclePrices;
 
   // Calculate loan amount from LTV in easy mode
   useEffect(() => {
