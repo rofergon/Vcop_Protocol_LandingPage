@@ -26,7 +26,7 @@ import { useAppKit } from '@reown/appkit/react';
 import { useCreatePosition } from '../hooks/useCreatePosition';
 import type { LoanTerms, CreatePositionParams } from '../hooks/useCreatePosition';
 import useContractAddresses from '../hooks/useContractAddresses';
-import { parseUnits, formatUnits } from 'viem';
+import { parseUnits, formatUnits, type Address } from 'viem';
 import MockETHFaucet from './components/MockETHFaucet';
 import { useUserPositions } from '../hooks/useUserPositions';
 import DebugPositions from './components/DebugPositions';
@@ -251,7 +251,6 @@ const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnected }) 
     txHash,
     step,
     balanceInfo,
-    allowanceInfo,
     isApprovePending,
     isCreateLoanPending,
     refetchBalances
@@ -811,18 +810,29 @@ const MyPositionsTab: React.FC = () => {
     refreshPositions,
     isRepaying,
     isApproving,
-    txError
+    txError,
+    getAssetSymbol: getAssetSymbolFromPositions
   } = useUserPositions();
 
-  // Hook centralizado de direcciones
-  const { getAssetSymbol: getAssetSymbolFromHook } = useContractAddresses();
-
-  // Asset symbol helper - Ahora usa el hook centralizado
+  // 🔧 FIX: Usar la función getAssetSymbol del hook useUserPositions que tiene las direcciones correctas
   const getAssetSymbol = (assetAddress: string): string => {
-    return getAssetSymbolFromHook(assetAddress)
+    return getAssetSymbolFromPositions(assetAddress as `0x${string}`)
   };
 
-
+  // 🔧 FIX: Función helper para formatear interés con decimales correctos
+  const formatInterest = (accruedInterest: bigint, loanAsset: string): string => {
+    const symbol = getAssetSymbol(loanAsset);
+    let decimals = 18; // Default para ETH
+    
+    if (symbol === 'USDC') {
+      decimals = 6;
+    }
+    
+    const divisor = Math.pow(10, decimals);
+    const formatted = (Number(accruedInterest) / divisor).toFixed(decimals === 6 ? 4 : 6);
+    
+    return `${formatted} ${symbol}`;
+  };
 
   const formatHealthFactor = (ratio: bigint): string => {
     if (ratio === 0n) return '0.0';
@@ -1024,7 +1034,7 @@ const MyPositionsTab: React.FC = () => {
               <div className="bg-white p-3 rounded-lg border border-gray-200">
                 <div className="text-xs text-gray-500 mb-1">Interest</div>
                 <div className="font-semibold text-gray-900">
-                  {(Number(positionData.accruedInterest) / 1e6).toFixed(4)} {getAssetSymbol(positionData.position.loanAsset)}
+                  {formatInterest(positionData.accruedInterest, positionData.position.loanAsset)}
                 </div>
               </div>
               
