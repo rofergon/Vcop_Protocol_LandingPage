@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useReadContract, usePublicClient } from 'wagmi'
 import { formatUnits, type Address } from 'viem'
 import MOCK_VCOP_ORACLE_ABI from '../Abis/MockVCOPOracle.json'
+import { useContractAddresses } from './useContractAddresses'
 
 interface OraclePrices {
   ETH: number
@@ -24,8 +25,6 @@ interface UseOraclePricesReturn {
   lastUpdated: Date | null
 }
 
-// Direcciones desde deployed-addresses-mock.json
-const ORACLE_ADDRESS = '0xd25a71640eDDF4461429CFDf90Dd4192467Cd6C5' as Address
 const FALLBACK_PRICES: OraclePrices = {
   ETH: 2500,
   WBTC: 45000, 
@@ -39,6 +38,10 @@ export function useOraclePrices(): UseOraclePricesReturn {
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   
+  // 🔍 Obtener la dirección correcta del oracle desde el archivo de configuración
+  const { addresses, isLoading: addressesLoading, error: addressesError } = useContractAddresses()
+  const oracleAddress = addresses?.mockVcopOracle
+  
   const publicClient = usePublicClient()
 
   // 🔍 Obtener precios actuales del oracle usando getCurrentMarketPrices()
@@ -48,12 +51,13 @@ export function useOraclePrices(): UseOraclePricesReturn {
     isLoading: isLoadingMarketPrices,
     error: marketPricesError 
   } = useReadContract({
-    address: ORACLE_ADDRESS,
+    address: oracleAddress,
     abi: MOCK_VCOP_ORACLE_ABI,
     functionName: 'getCurrentMarketPrices',
     query: {
       refetchOnWindowFocus: false,
       refetchInterval: 30000, // Actualizar cada 30 segundos
+      enabled: !!oracleAddress, // Solo ejecutar si tenemos la dirección
     }
   })
 
@@ -62,13 +66,28 @@ export function useOraclePrices(): UseOraclePricesReturn {
     data: oracleConfig,
     refetch: refetchConfig
   } = useReadContract({
-    address: ORACLE_ADDRESS,
+    address: oracleAddress,
     abi: MOCK_VCOP_ORACLE_ABI,
     functionName: 'getConfiguration',
     query: {
-      refetchOnWindowFocus: false
+      refetchOnWindowFocus: false,
+      enabled: !!oracleAddress, // Solo ejecutar si tenemos la dirección
     }
   })
+
+  // Manejar errores de direcciones
+  useEffect(() => {
+    if (addressesError) {
+      console.error('💥 Error loading contract addresses:', addressesError)
+      setError(`Failed to load oracle address: ${addressesError}`)
+    } else if (!addressesLoading && !oracleAddress) {
+      console.error('💥 Oracle address not found in configuration')
+      setError('Oracle address not found in configuration')
+    } else if (oracleAddress) {
+      console.log('✅ Using oracle address:', oracleAddress)
+      setError(null)
+    }
+  }, [addressesError, addressesLoading, oracleAddress])
 
   // Procesar datos del oracle cuando estén disponibles
   useEffect(() => {
@@ -163,7 +182,7 @@ export function useOraclePrices(): UseOraclePricesReturn {
 
   return {
     prices,
-    isLoading: isLoading || isLoadingMarketPrices,
+    isLoading: isLoading || isLoadingMarketPrices || addressesLoading,
     error,
     refetchPrices,
     lastUpdated
@@ -172,16 +191,19 @@ export function useOraclePrices(): UseOraclePricesReturn {
 
 // Hook auxiliar para obtener precio individual de un par específico
 export function useTokenPrice(baseToken: Address, quoteToken: Address) {
+  const { addresses } = useContractAddresses()
+  const oracleAddress = addresses?.mockVcopOracle
   const publicClient = usePublicClient()
   
   const { data: price, refetch, isLoading, error } = useReadContract({
-    address: ORACLE_ADDRESS,
+    address: oracleAddress,
     abi: MOCK_VCOP_ORACLE_ABI,
     functionName: 'getPrice',
     args: [baseToken, quoteToken],
     query: {
       refetchOnWindowFocus: false,
       refetchInterval: 60000, // Actualizar cada minuto
+      enabled: !!oracleAddress, // Solo ejecutar si tenemos la dirección
     }
   })
 
