@@ -1,23 +1,39 @@
-# MockETH Faucet - VCOP Protocol
+# VCOP Protocol - MockETH Faucet
 
-## 🚰 Faucet para MockETH en Base Sepolia
+## 🚰 Faucet para MockETH en Avalanche Fuji
 
 ### Descripción
-Hemos integrado un faucet de MockETH en la aplicación VCOP Protocol para facilitar las pruebas del protocolo de préstamos en Base Sepolia testnet.
+Hemos integrado un faucet de MockETH en la aplicación VCOP Protocol para facilitar las pruebas del protocolo de préstamos en Avalanche Fuji testnet.
 
-### Características
-- **Cantidad fija**: Mintea exactamente 1 ETH por transacción
-- **Ubicación**: Esquina superior derecha de los componentes CreatePosition
-- **Integración completa**: Manejo de estados, errores y confirmaciones
-- **Balance en tiempo real**: Muestra el balance actual de MockETH del usuario
-- **Enlaces a explorer**: Links directos a BaseScan para verificar transacciones
+### Funcionalidad
 
-### Funcionamiento
-1. **Conectar Wallet**: El usuario debe conectar su wallet a Base Sepolia
-2. **Hacer clic en "Get 1 ETH"**: Ejecuta la función mint del contrato MockETH
-3. **Confirmar transacción**: Aprobar la transacción en la wallet
-4. **Esperar confirmación**: El faucet mostrará el estado de la transacción
-5. **Balance actualizado**: El balance se actualiza automáticamente después del mint
+#### 🔗 Integración en la App
+El faucet está integrado directamente en la aplicación principal y se activa automáticamente cuando:
+
+#### 📋 Proceso de Uso
+1. **Conectar Wallet**: El usuario debe conectar su wallet a Avalanche Fuji
+2. **Acceder al Faucet**: Se muestra automáticamente cuando se detecta saldo insuficiente de MockETH
+3. **Solicitar Tokens**: Click en "Get Free MockETH" para recibir 10 MockETH
+4. **Confirmación**: La transacción se procesa y se actualiza el balance automáticamente
+
+#### 🔧 Detalles Técnicos
+- **Cantidad por solicitud**: 10 MockETH
+- **Cooldown**: Sin límites de tiempo (para facilitar testing)
+- **Gas Fee**: Pagado en AVAX (Avalanche Fuji testnet)
+- **Contrato MockETH**: Dirección actualizada en deployed-addresses-mock.json
+
+#### 📊 Características
+- **Red**: Avalanche Fuji (Chain ID: 43113)
+- **Explorador**: SnowTrace Testnet
+- **Actualizaciones automáticas**: El balance se refresca después de cada transacción
+- **Estados visuales**: Loading, success, error con feedback visual
+- **Enlaces directos**: Links a SnowTrace para verificar transacciones
+
+#### 🎯 Ventajas del Faucet Integrado
+- ✅ **Experiencia fluida**: No necesidad de ir a faucets externos
+- ✅ **Detección automática**: Se activa cuando es necesario
+- ✅ **Feedback en tiempo real**: Estados de loading y confirmación
+- ✅ **Integración perfecta**: Funciona junto con el resto de la aplicación
 
 ### Estados del Faucet
 - 🔌 **Sin conectar**: "Connect wallet"
@@ -30,7 +46,7 @@ Hemos integrado un faucet de MockETH en la aplicación VCOP Protocol para facili
 
 #### Contrato MockETH
 - **Dirección**: `0xDe3fd80E2bcCc96f5FB43ac7481036Db9998f521`
-- **Red**: Base Sepolia (Chain ID: 84532)
+- **Red**: Avalanche Fuji (Chain ID: 43113)
 - **Función**: `mint(address to, uint256 amount)`
 - **Cantidad**: 1 ETH (1 × 10^18 wei)
 
