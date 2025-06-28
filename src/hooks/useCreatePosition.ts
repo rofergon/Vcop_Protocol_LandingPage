@@ -294,21 +294,33 @@ export function useCreatePosition({
         loanAmountBigint = parseUnits(loanAmountStr, loanPrice.decimals)
       }
 
-      // Calcular valores en USD - CORREGIDO
-      // El oracle MockVCOP siempre devuelve precios con 6 decimales (no depende del token)
+      // Calcular valores en USD - CORREGIDO para manejar diferentes decimales
+      // El oracle MockVCOP siempre devuelve precios con 6 decimales
       const ORACLE_DECIMALS = 6
-      const collateralValueUSD = (collateralAmountBigint * collateralPrice.price) / BigInt(10 ** ORACLE_DECIMALS)
-      const loanValueUSD = (loanAmountBigint * loanPrice.price) / BigInt(10 ** ORACLE_DECIMALS)
+      
+      // Normalizar a 18 decimales para cálculos precisos
+      const NORMALIZED_DECIMALS = 18
+      
+      // Normalizar cantidades a 18 decimales
+      const collateralAmountNormalized = collateralAmountBigint * BigInt(10 ** (NORMALIZED_DECIMALS - collateralPrice.decimals))
+      const loanAmountNormalized = loanAmountBigint * BigInt(10 ** (NORMALIZED_DECIMALS - loanPrice.decimals))
+      
+      // Calcular valores en USD (normalizados a 18 decimales)
+      // precio * cantidad / 10^6 (oracle decimals) da el valor en USD con (18 + 6 - 6) = 18 decimals
+      const collateralValueUSD = (collateralAmountNormalized * collateralPrice.price) / BigInt(10 ** ORACLE_DECIMALS)
+      const loanValueUSD = (loanAmountNormalized * loanPrice.price) / BigInt(10 ** ORACLE_DECIMALS)
 
-      // Calcular LTV actual - CORREGIDO
+      // Calcular LTV actual
       // LTV = (loan value / collateral value) * 100
       const actualLTV = Number(loanValueUSD * 100n / collateralValueUSD)
 
       console.log('🔍 LTV Calculation Debug:')
-      console.log('  Collateral Amount:', collateralAmountBigint.toString())
-      console.log('  Loan Amount:', loanAmountBigint.toString())
-      console.log('  Collateral Price:', collateralPrice.price.toString())
-      console.log('  Loan Price:', loanPrice.price.toString())
+      console.log('  Collateral Amount (raw):', collateralAmountBigint.toString())
+      console.log('  Loan Amount (raw):', loanAmountBigint.toString())
+      console.log('  Collateral Amount (normalized):', collateralAmountNormalized.toString())
+      console.log('  Loan Amount (normalized):', loanAmountNormalized.toString())
+      console.log('  Collateral Price:', collateralPrice.price.toString(), `(${collateralPrice.decimals} decimals)`)
+      console.log('  Loan Price:', loanPrice.price.toString(), `(${loanPrice.decimals} decimals)`)
       console.log('  Collateral Value USD:', collateralValueUSD.toString())
       console.log('  Loan Value USD:', loanValueUSD.toString())
       console.log('  Calculated LTV:', actualLTV.toFixed(2) + '%')
