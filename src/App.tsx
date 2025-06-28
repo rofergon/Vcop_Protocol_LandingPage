@@ -189,7 +189,7 @@ function App() {
     },
     {
       question: "When will it be available on mainnet?",
-      answer: "We currently operate on Base Sepolia with full functionality. The mainnet launch is scheduled for Q1 2025, after completing the Halborn audit and reaching our fundraising goal of $700,000."
+      answer: "We currently operate on Avalanche Fuji with full functionality. The mainnet launch is scheduled for Q1 2025, after completing the Halborn audit and reaching our fundraising goal of $700,000."
     }
   ];
 
@@ -244,7 +244,7 @@ function App() {
             <div className="hidden lg:block">
               <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 <Globe className="w-3 h-3 mr-1.5" />
-                Live on Base Sepolia • Mainnet Q1 2025
+                Live on Avalanche Fuji • Mainnet Q1 2025
               </span>
             </div>
             
@@ -833,7 +833,7 @@ function App() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12 text-emerald-100">
             <div className="flex items-center justify-center">
               <Globe className="w-5 h-5 mr-2" />
-              <span className="text-sm">Live on Base Sepolia</span>
+              <span className="text-sm">Live on Avalanche Fuji</span>
             </div>
             <div className="flex items-center justify-center">
               <Clock className="w-5 h-5 mr-2" />
