@@ -9,7 +9,6 @@ import {
   DollarSign,
   Target,
   Activity,
-  Lock,
   Users,
   Globe,
   CheckCircle,
@@ -24,12 +23,8 @@ import {
   Calculator,
   PieChart,
   Wallet,
-  CreditCard,
   Smartphone,
-  Plus,
-  Minus,
-  ChevronRight,
-  X
+  ChevronRight
 } from 'lucide-react';
 import { InteractiveLoanDemo } from './components/InteractiveLoanDemo';
 import { DevaluationCalculator } from './components/DevaluationCalculator';
@@ -49,17 +44,14 @@ function App() {
   
   // AppKit hooks
   const { open } = useAppKit();
-  const { isConnected, address } = useAccount();
+  const { isConnected } = useAccount();
 
   // Function to launch the VCOP app
   const handleLaunchApp = () => {
     setShowApp(true);
   };
 
-  // Function to return to landing page
-  const handleBackToLanding = () => {
-    setShowApp(false);
-  };
+
 
   const stats = [
     { value: "2,600", label: "COP per USD (2014)", color: "text-green-400" },
