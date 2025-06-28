@@ -72,8 +72,8 @@ export const DebugPositions: React.FC = () => {
       : position.totalDebt;
     
     const result = await repayPosition(
-      contractAddresses.mockUSDC as Address,
-      totalDebtBigInt
+      totalDebtBigInt,
+      contractAddresses.mockUSDC as Address
     );
     
     if (result.success) {
@@ -95,8 +95,8 @@ export const DebugPositions: React.FC = () => {
       console.log('- Amount:', selectedAmount, 'USDC');
       
       const result = await repayPosition(
-        contractAddresses.mockUSDC as Address,
-        amountBigInt
+        amountBigInt,
+        contractAddresses.mockUSDC as Address
       );
       
       if (result.success) {
