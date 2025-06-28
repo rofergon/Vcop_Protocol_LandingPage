@@ -646,7 +646,7 @@ const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnected }) 
                          <span className="text-xs font-semibold">Success!</span>
                        </div>
                        <a 
-                         href={`https://sepolia.basescan.org/tx/${txHash}`}
+                         href={`https://subnets-test.avax.network/c-chain/tx/${txHash}`}
                          target="_blank"
                          rel="noopener noreferrer"
                          className="text-xs text-green-600 hover:text-green-800"
@@ -771,7 +771,7 @@ const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnected }) 
                     {txHash && (
                       <ExternalLink 
                         className="w-3 h-3 cursor-pointer" 
-                        onClick={() => window.open(`https://sepolia.basescan.org/tx/${txHash}`, '_blank')}
+                        onClick={() => window.open(`https://subnets-test.avax.network/c-chain/tx/${txHash}`, '_blank')}
                       />
                     )}
                   </>
@@ -1240,7 +1240,7 @@ const MyPositionsTab: React.FC = () => {
               
               <button
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                onClick={() => window.open(`https://sepolia.basescan.org/address/${positionData.position.borrower}`, '_blank')}
+                                      onClick={() => window.open(`https://subnets-test.avax.network/c-chain/address/${positionData.position.borrower}`, '_blank')}
               >
                 <ExternalLink className="w-4 h-4" />
               </button>
@@ -1339,7 +1339,7 @@ export const LoanApp: React.FC = () => {
             
             <div className="flex items-center gap-4">
               <div className="text-sm text-gray-600">
-                Network: <span className="text-emerald-600 font-semibold">Base Sepolia</span>
+                                  Network: <span className="text-emerald-600 font-semibold">Avalanche Fuji</span>
               </div>
               
               <button 
