@@ -60,7 +60,7 @@ const AboutMe: React.FC = () => {
   ];
 
   const achievements = [
-    { icon: <Award className="w-6 h-6" />, title: "VCOP Protocol Launch", desc: "Successfully launched on Base Sepolia" },
+    { icon: <Award className="w-6 h-6" />, title: "VCOP Protocol Launch", desc: "Successfully launched on Avalanche Fuji" },
     { icon: <Shield className="w-6 h-6" />, title: "Security First", desc: "Halborn audit in progress" },
     { icon: <Users className="w-6 h-6" />, title: "Community Building", desc: "Growing Latin American DeFi community" },
     { icon: <Lightbulb className="w-6 h-6" />, title: "Innovation", desc: "First peso-pegged DeFi protocol" }
