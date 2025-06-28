@@ -81,7 +81,7 @@ const MockETHFaucet: React.FC = () => {
                 </button>
                 {txHash && (
                   <a
-                    href={`https://sepolia.basescan.org/tx/${txHash}`}
+                    href={`https://subnets-test.avax.network/c-chain/tx/${txHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="bg-blue-600 text-white py-1 px-2 rounded text-xs hover:bg-blue-700 transition-colors"
