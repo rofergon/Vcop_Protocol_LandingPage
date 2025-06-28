@@ -15,11 +15,6 @@ interface Position {
   };
 }
 
-interface ContractAddresses {
-  mockUSDC: Address;
-  [key: string]: Address;
-}
-
 export const DebugPositions: React.FC = () => {
   const { address, isConnected } = useAccount();
   const { 
