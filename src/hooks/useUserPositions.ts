@@ -223,7 +223,7 @@ export function useUserPositions() {
   // 🔍 LECTURA DE POSICIONES DEL USUARIO
   // ===================================
 
-  // Obtener IDs de posiciones del usuario
+  // 🔥 OPTIMIZACIÓN: Obtener IDs de posiciones del usuario con menos frecuencia
   const { 
     data: userPositionIds, 
     refetch: refetchPositionIds,
@@ -235,7 +235,11 @@ export function useUserPositions() {
     args: address ? [address] : undefined,
     query: {
       enabled: Boolean(contractAddresses?.flexibleLoanManager && address),
-      refetchOnWindowFocus: false
+      refetchOnWindowFocus: false,
+      staleTime: 30000, // 🔥 Cache durante 30 segundos
+      gcTime: 300000, // 🔥 Mantener en cache por 5 minutos
+      retry: 2, // 🔥 Solo 2 reintentos
+      retryDelay: 3000 // 🔥 3 segundos entre reintentos
     }
   })
   
@@ -294,7 +298,7 @@ export function useUserPositions() {
     return contracts
   }, [userPositionIds, contractAddresses?.flexibleLoanManager])
 
-  // Leer todos los datos de las posiciones
+  // 🔥 OPTIMIZACIÓN: Leer todos los datos de las posiciones con cache inteligente
   const { 
     data: positionContractData, 
     refetch: refetchPositionData,
@@ -303,7 +307,12 @@ export function useUserPositions() {
     contracts: positionContracts,
     query: {
       enabled: positionContracts.length > 0,
-      refetchOnWindowFocus: false
+      refetchOnWindowFocus: false,
+      staleTime: 15000, // 🔥 Cache durante 15 segundos
+      gcTime: 180000, // 🔥 Mantener en cache por 3 minutos
+      retry: 1, // 🔥 Solo 1 reintento para múltiples contratos
+      retryDelay: 5000, // 🔥 5 segundos entre reintentos
+      refetchOnMount: false // 🔥 No refetch automático al montar
     }
   })
 
@@ -524,15 +533,19 @@ export function useUserPositions() {
   }, [address, walletClient, chainId])
 
   /**
-   * Refrescar todos los datos
+   * 🔥 OPTIMIZACIÓN: Refrescar datos con throttling para evitar spam de solicitudes
    */
   const refreshPositions = useCallback(async () => {
     try {
       setIsLoading(true)
-      await Promise.all([
-        refetchPositionIds(),
-        refetchPositionData()
-      ])
+      
+      // 🔥 OPTIMIZACIÓN: Batch las solicitudes con delay para evitar saturar RPC
+      await refetchPositionIds()
+      
+      // Esperar un poco antes de la segunda solicitud
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      await refetchPositionData()
     } catch (error) {
       console.error('Error refreshing positions:', error)
       setError('Failed to refresh positions')
@@ -540,6 +553,23 @@ export function useUserPositions() {
       setIsLoading(false)
     }
   }, [refetchPositionIds, refetchPositionData])
+
+  // 🔥 OPTIMIZACIÓN: Throttle para refreshPositions (máximo una vez cada 3 segundos)
+  const throttledRefreshPositions = useCallback(
+    (() => {
+      let lastCall = 0
+      return async () => {
+        const now = Date.now()
+        if (now - lastCall >= 3000) { // 3 segundos de throttle
+          lastCall = now
+          await refreshPositions()
+        } else {
+          console.log('🔥 Refresh throttled - too many requests')
+        }
+      }
+    })(),
+    [refreshPositions]
+  )
 
   /**
    * Detecta qué asset handler maneja un token específico
@@ -756,11 +786,13 @@ export function useUserPositions() {
       console.log('✅ Repayment successful! Transaction:', repayHash)
       setTransactionStep('idle')
 
-      // 9. Wait for transaction and refresh data
-      await publicClient?.waitForTransactionReceipt({ hash: repayHash })
-      
-      // 10. Refresh position data to confirm repayment
-      await refreshPositions()
+              // 9. Wait for transaction and refresh data
+        await publicClient?.waitForTransactionReceipt({ hash: repayHash })
+        
+        // 10. 🔥 OPTIMIZACIÓN: Usar refresh normal con delay para evitar spam
+        setTimeout(() => {
+          refreshPositions()
+        }, 2000) // Esperar 2 segundos antes de refrescar
 
       // 11. Check if position is now inactive (fully repaid)
       const updatedPosition = positionsData.find(p => p.positionId === positionId)
@@ -935,9 +967,10 @@ export function useUserPositions() {
         console.log('🎉 Partial repayment successful! Hash:', repayHash)
         setTransactionStep('idle')
         
+        // 🔥 OPTIMIZACIÓN: Usar refresh normal con delay
         setTimeout(() => {
           refreshPositions()
-        }, 1500)
+        }, 2000)
         
         return { success: true, txHash: repayHash }
       } catch (repayError: any) {
@@ -1003,10 +1036,10 @@ export function useUserPositions() {
     isLoading: isProcessing,
     error: error || txError?.message,
     
-    // 🚀 Funciones
+    // 🚀 Funciones - Usando versión throttled para refresh
     repayFullPosition,
     repayPartialPosition,
-    refreshPositions,
+    refreshPositions: throttledRefreshPositions, // 🔥 OPTIMIZACIÓN: Usar versión throttled
     getAssetSymbol: getAssetSymbolFromAddresses,
     
     // 🔄 Estados de transacciones
