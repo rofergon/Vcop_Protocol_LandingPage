@@ -360,10 +360,10 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
         <div className="flex items-center justify-between mb-1">
           <div>
             <h3 className="text-lg font-bold mb-1">🚀 Real VCOP Position Creator</h3>
-            <p className="text-emerald-100 text-sm">Create actual positions on Base Sepolia!</p>
+                              <p className="text-emerald-100 text-sm">Create actual positions on Avalanche Fuji!</p>
             <div className="flex items-center gap-2 text-xs text-emerald-100 mt-1">
               <Activity className="w-3 h-3" />
-              <span>Connected to Base Sepolia testnet</span>
+                              <span>Connected to Avalanche Fuji testnet</span>
             </div>
           </div>
           <div className="bg-white/20 p-2 rounded-lg">
@@ -405,7 +405,7 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
           <div className="text-center py-12">
             <Wallet className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Connect Your Wallet</h3>
-            <p className="text-gray-600 mb-4">Connect to Base Sepolia to create real positions.</p>
+                          <p className="text-gray-600 mb-4">Connect to Avalanche Fuji to create real positions.</p>
             <button 
               onClick={() => open()}
               className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 mx-auto"
@@ -734,13 +734,13 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                     </div>
                     <p className="text-green-700 text-sm mb-2">Position created successfully!</p>
                     <a 
-                      href={`https://sepolia.basescan.org/tx/${txHash}`}
+                      href={`https://subnets-test.avax.network/c-chain/tx/${txHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-800 underline"
                     >
                       <ExternalLink className="w-3 h-3" />
-                      View on BaseScan
+                      View on SnowTrace
                     </a>
                   </div>
                 )}
@@ -877,13 +877,13 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                     </div>
                     <p className="text-green-700 text-sm mb-2">Position created successfully!</p>
                     <a 
-                      href={`https://sepolia.basescan.org/tx/${txHash}`}
+                      href={`https://subnets-test.avax.network/c-chain/tx/${txHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-800 underline"
                     >
                       <ExternalLink className="w-3 h-3" />
-                      View on BaseScan
+                      View on SnowTrace
                     </a>
                   </div>
                 )}
@@ -933,7 +933,7 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                     {txHash && (
                       <ExternalLink 
                         className="w-4 h-4 cursor-pointer" 
-                        onClick={() => window.open(`https://sepolia.basescan.org/tx/${txHash}`, '_blank')}
+                        onClick={() => window.open(`https://subnets-test.avax.network/c-chain/tx/${txHash}`, '_blank')}
                       />
                     )}
                   </>
