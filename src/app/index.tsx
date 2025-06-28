@@ -44,7 +44,6 @@ const AssetIcon: React.FC<{ asset: string; className?: string }> = ({ asset, cla
           alt="ETH" 
           className={`${className} inline-block align-middle`}
           onError={(e) => {
-            console.warn('Failed to load ETH icon');
             e.currentTarget.style.display = 'none';
           }}
         />
@@ -57,7 +56,6 @@ const AssetIcon: React.FC<{ asset: string; className?: string }> = ({ asset, cla
           alt="BTC" 
           className={`${className} inline-block align-middle`}
           onError={(e) => {
-            console.warn('Failed to load BTC icon');
             e.currentTarget.style.display = 'none';
           }}
         />
@@ -65,15 +63,14 @@ const AssetIcon: React.FC<{ asset: string; className?: string }> = ({ asset, cla
     case 'VCOP':
       return (
         <div className={`${className} inline-block align-middle bg-gradient-to-br from-emerald-500 to-teal-500 rounded-full p-0.5 flex items-center justify-center`}>
-          <img 
-            src="/logovcop.png" 
-            alt="VCOP" 
-            className="w-full h-full object-contain rounded-full"
-            onError={(e) => {
-              console.warn('Failed to load VCOP icon');
-              e.currentTarget.style.display = 'none';
-            }}
-          />
+                      <img 
+              src="/logovcop.png" 
+              alt="VCOP" 
+              className="w-full h-full object-contain rounded-full"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
         </div>
       );
     case 'USDC':
@@ -83,7 +80,6 @@ const AssetIcon: React.FC<{ asset: string; className?: string }> = ({ asset, cla
           alt="USDC" 
           className={`${className} inline-block align-middle`}
           onError={(e) => {
-            console.warn('Failed to load USDC icon');
             e.currentTarget.style.display = 'none';
           }}
         />
@@ -284,22 +280,16 @@ const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnected }) 
     try {
       // 🔍 Mapear assets seleccionados a direcciones de contratos
       const getAssetAddress = (asset: string) => {
-        console.log('🔍 Mapping asset:', asset, 'to address');
         switch (asset.toUpperCase()) {
           case 'ETH': 
-            console.log('  → ETH mapped to:', addresses.mockETH);
             return addresses.mockETH;
           case 'USDC': 
-            console.log('  → USDC mapped to:', addresses.mockUSDC);
             return addresses.mockUSDC;
           case 'WBTC': 
-            console.log('  → WBTC mapped to:', addresses.mockWBTC);
             return addresses.mockWBTC;
           case 'VCOP': 
-            console.log('  → VCOP mapped to USDC:', addresses.mockUSDC);
             return addresses.mockUSDC; // VCOP no existe, usar USDC
           default: 
-            console.log('  → Default mapped to ETH:', addresses.mockETH);
             return addresses.mockETH;
         }
       };
@@ -317,14 +307,6 @@ const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnected }) 
         interestRate: 8, // 8% APR
         duration: 0n // Perpetual
       };
-
-      console.log('🚀 Creating position with user selections:', {
-        collateral: collateralAsset,
-        loan: loanAsset,
-        collateralAddress: customTerms.collateralAsset,
-        loanAddress: customTerms.loanAsset,
-        terms: customTerms
-      });
 
       await createPosition(customTerms);
     } catch (error) {
@@ -1064,14 +1046,7 @@ const MyPositionsTab: React.FC = () => {
                     const collateralSymbol = getAssetSymbol(positionData.position.collateralAsset);
                     const loanSymbol = getAssetSymbol(positionData.position.loanAsset);
                     
-                    console.log('🔍 LTV Calculation Debug:', {
-                      positionId: positionData.positionId.toString(),
-                      collateralSymbol,
-                      loanSymbol,
-                      collateralValueFormatted: positionData.collateralValueFormatted,
-                      debtValueFormatted: positionData.debtValueFormatted,
-                      oraclePrices
-                    });
+
                     
                     // Obtener cantidades ya normalizadas (el hook useUserPositions ya las normaliza por decimales)
                     const collateralAmount = parseFloat(positionData.collateralValueFormatted);
@@ -1115,14 +1090,7 @@ const MyPositionsTab: React.FC = () => {
                     const collateralValueUSD = collateralAmount * collateralPrice;
                     const loanValueUSD = loanAmount * loanPrice;
                     
-                    console.log('💰 Value Calculation:', {
-                      collateralAmount,
-                      loanAmount,
-                      collateralPrice,
-                      loanPrice,
-                      collateralValueUSD,
-                      loanValueUSD
-                    });
+
                     
                     if (collateralValueUSD === 0) return '0.0%';
                     
@@ -1138,10 +1106,8 @@ const MyPositionsTab: React.FC = () => {
               <button
                 onClick={async () => {
                   try {
-                    console.log('🔄 Starting full repayment for position:', positionData.positionId.toString());
                     const result = await repayFullPosition(positionData.positionId, positionData.position.loanAsset);
                     if (result.success) {
-                      console.log('✅ Position repaid successfully:', result.txHash);
                       if (result.message) {
                         alert(result.message);
                       } else {
@@ -1149,7 +1115,6 @@ const MyPositionsTab: React.FC = () => {
                       }
                       refreshPositions();
                     } else {
-                      console.error('❌ Repayment failed:', result.error);
                       if (result.error?.includes('already been repaid')) {
                         alert('ℹ️ This loan has already been repaid. You can now withdraw your collateral.');
                       } else if (result.error?.includes('cancelled')) {
@@ -1161,7 +1126,6 @@ const MyPositionsTab: React.FC = () => {
                       }
                     }
                   } catch (error) {
-                    console.error('❌ Unexpected error:', error);
                     alert('❌ An unexpected error occurred. Please try again.');
                   }
                 }}
@@ -1202,18 +1166,15 @@ const MyPositionsTab: React.FC = () => {
                     try {
                       const amount = prompt("Enter amount to repay (USDC):");
                       if (amount && !isNaN(Number(amount)) && Number(amount) > 0) {
-                        console.log('🔄 Starting partial repayment for position:', positionData.positionId.toString(), 'amount:', amount);
                         const result = await repayPartialPosition(
                           positionData.positionId, 
                           positionData.position.loanAsset, 
                           BigInt(Math.floor(Number(amount) * 1e6))
                         );
                         if (result.success) {
-                          console.log('✅ Partial repayment successful:', result.txHash);
                           alert(`✅ Successfully repaid ${amount} USDC!`);
                           refreshPositions();
                         } else {
-                          console.error('❌ Partial repayment failed:', result.error);
                           if (result.error?.includes('cancelled')) {
                             alert('❌ Transaction was cancelled by user.');
                           } else if (result.error?.includes('insufficient')) {
@@ -1226,7 +1187,6 @@ const MyPositionsTab: React.FC = () => {
                         alert('❌ Please enter a valid amount greater than 0.');
                       }
                     } catch (error) {
-                      console.error('❌ Unexpected error:', error);
                       alert('❌ An unexpected error occurred. Please try again.');
                     }
                   }}
