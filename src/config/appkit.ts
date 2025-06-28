@@ -1,6 +1,6 @@
 import { createAppKit } from '@reown/appkit/react'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
-import { mainnet, arbitrum, base, sepolia, baseSepolia } from '@reown/appkit/networks'
+import { mainnet, arbitrum, base, sepolia, avalanche } from '@reown/appkit/networks'
 import { QueryClient } from '@tanstack/react-query'
 import type { AppKitNetwork } from '@reown/appkit/networks'
 
@@ -18,21 +18,36 @@ const metadata = {
   icons: ['/logovcop.png']
 }
 
-// 3. Configure Base Sepolia with official RPC
-const baseSepoliaCustom: AppKitNetwork = {
-  ...baseSepolia,
+// 3. Configure Avalanche Fuji with official RPC
+const avalancheFujiCustom: AppKitNetwork = {
+  id: 43113,
+  name: 'Avalanche Fuji C-Chain',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'AVAX',
+    symbol: 'AVAX',
+  },
   rpcUrls: {
     default: {
-      http: ['https://sepolia.base.org']
+      http: ['https://api.avax-test.network/ext/bc/C/rpc'],
+      webSocket: ['wss://api.avax-test.network/ext/bc/C/ws']
     },
     public: {
-      http: ['https://sepolia.base.org']
+      http: ['https://api.avax-test.network/ext/bc/C/rpc'],
+      webSocket: ['wss://api.avax-test.network/ext/bc/C/ws']
     }
-  }
+  },
+  blockExplorers: {
+    default: { 
+      name: 'SnowTrace', 
+      url: 'https://subnets-test.avax.network/c-chain' 
+    },
+  },
+  testnet: true
 }
 
-// 4. Set the networks - Base Sepolia first for development
-const networks = [baseSepoliaCustom, base, mainnet, arbitrum, sepolia] as [AppKitNetwork, ...AppKitNetwork[]]
+// 4. Set the networks - Avalanche Fuji first for development
+const networks = [avalancheFujiCustom, avalanche, base, mainnet, arbitrum, sepolia] as [AppKitNetwork, ...AppKitNetwork[]]
 
 // 5. Create Wagmi Adapter
 const wagmiAdapter = new WagmiAdapter({
