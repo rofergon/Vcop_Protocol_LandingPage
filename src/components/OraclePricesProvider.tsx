@@ -9,6 +9,7 @@ interface OraclePrices {
   WBTC: number  
   USDC: number
   VCOP: number
+  WGOLD: number // Nueva coin WGOLD (oro wrapped)
 }
 
 interface OraclePricesContextType {
@@ -23,7 +24,8 @@ const FALLBACK_PRICES: OraclePrices = {
   ETH: 2500,
   WBTC: 45000, 
   USDC: 1,
-  VCOP: 1/4100
+  VCOP: 1/4100,
+  WGOLD: 3302.30 // Precio del oro - Futuros del Precio del Oro (GCM3)
 }
 
 const OraclePricesContext = createContext<OraclePricesContextType | undefined>(undefined)
@@ -67,7 +69,8 @@ export function OraclePricesProvider({ children }: OraclePricesProviderProps) {
           ETH: parseFloat(formatUnits(ethPriceRaw, 6)) || FALLBACK_PRICES.ETH,
           WBTC: parseFloat(formatUnits(btcPriceRaw, 6)) || FALLBACK_PRICES.WBTC,
           USDC: 1, // USDC siempre es $1
-          VCOP: parseFloat(formatUnits(vcopPriceRaw, 6)) || FALLBACK_PRICES.VCOP
+          VCOP: parseFloat(formatUnits(vcopPriceRaw, 6)) || FALLBACK_PRICES.VCOP,
+          WGOLD: FALLBACK_PRICES.WGOLD // WGOLD siempre es el valor fijo
         }
 
         // Validar que los precios sean razonables
