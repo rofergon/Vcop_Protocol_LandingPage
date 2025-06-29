@@ -32,6 +32,8 @@ const AssetIcon: React.FC<{ asset: string; className?: string }> = ({ asset, cla
       );
     case 'usdc':
       return <img src="/usd-coin-usdc-logo.svg" alt="USDC" className={`${className} inline-block align-middle`} />;
+    case 'wgold':
+      return <img src="/a6704b41-49c8-4224-8257-01388c290d3sinfondof.png" alt="WGOLD" className={`${className} inline-block align-middle rounded-full`} />;
     default:
       return <DollarSign className={`${className} inline-block align-middle`} />;
   }
