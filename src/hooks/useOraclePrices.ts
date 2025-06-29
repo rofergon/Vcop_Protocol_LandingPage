@@ -17,6 +17,7 @@ export interface OraclePrices {
   WBTC: number  
   USDC: number
   VCOP: number
+  WGOLD: number // Nueva coin WGOLD (oro wrapped)
 }
 
 export interface UseOraclePricesReturn {
