@@ -45,6 +45,8 @@ const AssetIcon: React.FC<{ asset: string; className?: string }> = ({ asset, cla
       );
     case 'usdc':
       return <img src="/usd-coin-usdc-logo.svg" alt="USDC" className={`${className} inline-block align-middle`} />;
+    case 'wgold':
+      return <img src="/a6704b41-49c8-4224-8257-01388c290d3sinfondof.png" alt="WGOLD" className={`${className} inline-block align-middle rounded-full`} />;
     default:
       return <DollarSign className={`${className} inline-block align-middle`} />;
   }
@@ -268,6 +270,9 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
           case 'VCOP': 
             console.log('  → VCOP mapped to USDC:', addresses.mockUSDC);
             return addresses.mockUSDC; // VCOP no existe, usar USDC
+          case 'WGOLD': 
+            console.log('  → WGOLD mapped to USDC:', addresses.mockUSDC);
+            return addresses.mockUSDC; // WGOLD no existe como contrato, usar USDC
           default: 
             console.log('  → Default mapped to ETH:', addresses.mockETH);
             return addresses.mockETH;
@@ -496,7 +501,8 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                       options={[
                         { value: "ETH", label: "ETH" },
                         { value: "WBTC", label: "WBTC" },
-                        { value: "USDC", label: "USDC" }
+                        { value: "USDC", label: "USDC" },
+                        { value: "WGOLD", label: "WGOLD" }
                       ]}
                       borderColor="border-blue-300"
                     />
@@ -542,7 +548,8 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                         options={[
                           { value: "USDC", label: "USDC" },
                           { value: "VCOP", label: "VCOP" },
-                          { value: "ETH", label: "ETH" }
+                          { value: "ETH", label: "ETH" },
+                          { value: "WGOLD", label: "WGOLD" }
                         ]}
                         borderColor="border-emerald-300"
                       />
@@ -660,7 +667,7 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                     <div className="text-center bg-white p-2 rounded-lg">
                       <div className="text-sm font-bold text-gray-900">
                         ${assetPrices.ETH.toLocaleString()}
@@ -687,6 +694,13 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                         ${assetPrices.VCOP.toFixed(6)}
                       </div>
                       <div className="text-xs text-gray-600">VCOP</div>
+                    </div>
+                    
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className="text-sm font-bold text-gray-900">
+                        ${assetPrices.WGOLD.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-gray-600">WGOLD</div>
                     </div>
                   </div>
                   
@@ -762,7 +776,8 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                       options={[
                         { value: "ETH", label: "Ethereum (ETH)" },
                         { value: "WBTC", label: "Wrapped Bitcoin (WBTC)" },
-                        { value: "USDC", label: "USD Coin (USDC)" }
+                        { value: "USDC", label: "USD Coin (USDC)" },
+                        { value: "WGOLD", label: "Wrapped Gold (WGOLD)" }
                       ]}
                     />
                   </div>
@@ -774,7 +789,8 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                       options={[
                         { value: "USDC", label: "USD Coin (USDC)" },
                         { value: "VCOP", label: "VCOP Peso" },
-                        { value: "ETH", label: "Ethereum (ETH)" }
+                        { value: "ETH", label: "Ethereum (ETH)" },
+                        { value: "WGOLD", label: "Wrapped Gold (WGOLD)" }
                       ]}
                     />
                   </div>
