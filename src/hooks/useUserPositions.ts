@@ -35,6 +35,9 @@ import { base } from 'wagmi/chains'
 import FLEXIBLE_LOAN_MANAGER_ABI from '../Abis/FlexibleLoanManager.json'
 import VAULT_BASED_HANDLER_ABI from '../Abis/VaultBasedHandler.json'
 
+// 🔥 MIGRACIÓN: Usar hook centralizado en lugar de carga directa
+import { useContractAddresses, type ContractAddresses } from './useContractAddresses'
+
 // Permit2 Contract Address (Same across all chains)
 const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3' as Address
 
@@ -136,14 +139,6 @@ export interface PositionData {
   debtValueFormatted: string
 }
 
-export interface ContractAddresses {
-  flexibleLoanManager: Address
-  vaultBasedHandler: Address
-  mockETH: Address
-  mockUSDC: Address
-  feeCollector: Address
-}
-
 export interface RepaymentResult {
   success: boolean
   txHash?: Hash
@@ -177,47 +172,23 @@ export function useUserPositions() {
   const { data: walletClient } = useWalletClient()
   const publicClient = usePublicClient()
 
-  // Estados del hook
-  const [contractAddresses, setContractAddresses] = useState<ContractAddresses | null>(null)
+  // 🔥 REFACTORIZACIÓN: Usar hook centralizado
+  const { 
+    addresses: contractAddresses, 
+    isLoading: addressesLoading,
+    error: addressesError,
+    getAssetSymbol: getAssetSymbolFromHook,
+    isReady: addressesReady
+  } = useContractAddresses()
+
+  // Estados del hook (sin contractAddresses local)
   const [positionsData, setPositionsData] = useState<PositionData[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [transactionStep, setTransactionStep] = useState<'idle' | 'approving' | 'repaying'>('idle')
 
-  // ===================================
-  // 📡 CARGA DE CONFIGURACIÓN
-  // ===================================
-
-  // Cargar direcciones de contratos
-  useEffect(() => {
-    const loadContractAddresses = async () => {
-      try {
-        const response = await fetch('/deployed-addresses-mock.json')
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-        
-        const data = await response.json()
-        
-        const addresses = {
-          flexibleLoanManager: data.coreLending?.flexibleLoanManager as Address,
-          vaultBasedHandler: data.coreLending?.vaultBasedHandler as Address,
-          mockETH: data.tokens?.mockETH as Address,
-          mockUSDC: data.tokens?.mockUSDC as Address,
-          feeCollector: data.config?.feeCollector as Address
-        }
-        
-        console.log('🏗️ Contract addresses loaded:', addresses)
-        setContractAddresses(addresses)
-      } catch (err) {
-        console.error('Error loading contract addresses:', err)
-        setError(`Failed to load contract addresses: ${err instanceof Error ? err.message : 'Unknown error'}`)
-      }
-    }
-
-    loadContractAddresses()
-  }, [chainId])
+  // 🔥 OPTIMIZACIÓN: Combinar errores
+  const combinedError = error || addressesError
 
   // ===================================
   // 🔍 LECTURA DE POSICIONES DEL USUARIO
@@ -234,7 +205,7 @@ export function useUserPositions() {
     functionName: 'getUserPositions',
     args: address ? [address] : undefined,
     query: {
-      enabled: Boolean(contractAddresses?.flexibleLoanManager && address),
+      enabled: Boolean(contractAddresses?.flexibleLoanManager && address && addressesReady),
       refetchOnWindowFocus: false,
       staleTime: 30000, // 🔥 Cache durante 30 segundos
       gcTime: 300000, // 🔥 Mantener en cache por 5 minutos
@@ -350,7 +321,10 @@ export function useUserPositions() {
             if (addressLower === contractAddresses?.mockUSDC?.toLowerCase()) {
               return 6 // USDC tiene 6 decimales
             }
-            return 18 // ETH y otros tokens típicamente tienen 18 decimales
+            if (addressLower === contractAddresses?.mockWBTC?.toLowerCase()) {
+              return 8 // WBTC tiene 8 decimales
+            }
+            return 18 // ETH, VCOP y otros tokens típicamente tienen 18 decimales
           }
           
           // Formatear valores con decimales correctos
@@ -1020,12 +994,7 @@ export function useUserPositions() {
   ])
 
   const isProcessing = isLoading || isLoadingIds || isLoadingData || 
-                      isPending || transactionStep !== 'idle'
-
-  // 🔧 FIX: Función helper para obtener símbolo del asset
-  const getAssetSymbolFromAddresses = useCallback((assetAddress: Address): string => {
-    return getAssetSymbol(assetAddress, contractAddresses || undefined)
-  }, [contractAddresses])
+                      isPending || transactionStep !== 'idle' || addressesLoading
 
   return {
     // 📊 Datos
@@ -1034,13 +1003,13 @@ export function useUserPositions() {
     
     // 🔄 Estados
     isLoading: isProcessing,
-    error: error || txError?.message,
+    error: combinedError || txError?.message,
     
     // 🚀 Funciones - Usando versión throttled para refresh
     repayFullPosition,
     repayPartialPosition,
     refreshPositions: throttledRefreshPositions, // 🔥 OPTIMIZACIÓN: Usar versión throttled
-    getAssetSymbol: getAssetSymbolFromAddresses,
+    getAssetSymbol: getAssetSymbolFromHook, // 🔥 REFACTORIZACIÓN: Usar función del hook centralizado
     
     // 🔄 Estados de transacciones
     isApproving: transactionStep === 'approving',
@@ -1064,7 +1033,11 @@ function calculateHealthFactor(ratio: bigint): string {
   return healthFactor.toFixed(2)
 }
 
+// 🔥 DEPRECATED: Esta función ahora está centralizada en useContractAddresses
+// Se mantiene solo para compatibilidad retroactiva
 export function getAssetSymbol(assetAddress: Address, contractAddresses?: ContractAddresses): string {
+  console.warn('⚠️ getAssetSymbol is deprecated. Use useContractAddresses().getAssetSymbol() instead')
+  
   if (!contractAddresses) {
     // Fallback para direcciones hardcodeadas (compatibilidad)
     const symbolMap: Record<string, string> = {
@@ -1084,6 +1057,12 @@ export function getAssetSymbol(assetAddress: Address, contractAddresses?: Contra
   }
   if (addressLower === contractAddresses.mockUSDC?.toLowerCase()) {
     return 'USDC'
+  }
+  if (addressLower === contractAddresses.mockWBTC?.toLowerCase()) {
+    return 'WBTC'
+  }
+  if (addressLower === contractAddresses.vcopToken?.toLowerCase()) {
+    return 'VCOP'
   }
   
   // Fallback para direcciones no reconocidas
