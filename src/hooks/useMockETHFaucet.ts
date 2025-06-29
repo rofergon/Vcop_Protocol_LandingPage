@@ -69,6 +69,8 @@ export function useMockETHFaucet() {
       }));
 
       console.log('🚀 Minting ETH using address:', addresses.mockETH);
+      console.log('💰 Minting to user:', address);
+      console.log('📄 Using ABI:', MockETHABI);
 
       await mintETH({
         address: addresses.mockETH,
@@ -80,7 +82,13 @@ export function useMockETHFaucet() {
       setState(prev => ({ ...prev, isConfirming: true }));
 
     } catch (error) {
-      console.error('Error requesting ETH:', error);
+      console.error('💥 Error requesting ETH:', error);
+      console.error('💥 Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        cause: error instanceof Error ? (error as any).cause : null,
+        stack: error instanceof Error ? error.stack : null
+      });
+      
       setState(prev => ({ 
         ...prev, 
         isLoading: false, 
@@ -105,6 +113,7 @@ export function useMockETHFaucet() {
   // Actualizar estado basado en el resultado de la transacción
   useEffect(() => {
     if (isMintSuccess && mintHash) {
+      console.log('✅ Mint transaction successful:', mintHash);
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -119,14 +128,38 @@ export function useMockETHFaucet() {
 
   useEffect(() => {
     if (mintError || receiptError) {
-      const errorMessage = mintError?.message || receiptError?.message || 'Transaction failed';
+      const error = mintError || receiptError;
+      console.error('💥 Transaction error:', error);
+      console.error('💥 Error type:', {
+        isMintError: !!mintError,
+        isReceiptError: !!receiptError,
+        errorName: error?.name,
+        errorMessage: error?.message,
+        errorCause: (error as any)?.cause,
+        errorDetails: error
+      });
+
+      let errorMessage = 'Failed to mint ETH';
+      
+      if (error?.message) {
+        if (error.message.includes('User rejected') || error.message.includes('user rejected')) {
+          errorMessage = 'Transaction rejected by user';
+        } else if (error.message.includes('insufficient funds')) {
+          errorMessage = 'Insufficient funds for gas';
+        } else if (error.message.includes('execution reverted')) {
+          errorMessage = 'Contract execution failed - contract may have restrictions';
+        } else if (error.message.includes('nonce')) {
+          errorMessage = 'Transaction nonce error - try again';
+        } else {
+          errorMessage = `Transaction failed: ${error.message}`;
+        }
+      }
+
       setState(prev => ({
         ...prev,
         isLoading: false,
         isConfirming: false,
-        error: errorMessage.includes('User rejected') 
-          ? 'Transaction rejected by user' 
-          : 'Failed to mint ETH'
+        error: errorMessage
       }));
     }
   }, [mintError, receiptError]);
