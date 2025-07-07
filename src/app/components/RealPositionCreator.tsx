@@ -200,7 +200,7 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
   // Hook para direcciones de contratos
   const { addresses } = useContractAddresses();
 
-  // Hook para crear posiciones
+  // Hook para crear posiciones (MEJORADO)
   const {
     createPosition,
     resetState,
@@ -210,7 +210,9 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
     txHash,
     step,
     balanceInfo,
-    refetchBalances
+    refetchBalances,
+    // 🆕 NUEVA INFORMACIÓN DE PROGRESO
+    progressInfo
   } = useCreatePosition({
     autoVerifyBalances: true
   });
@@ -352,6 +354,73 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
   // Calculate risk metrics based on current LTV
   const riskLevel = calculateRiskLevel(isEasyMode ? easyLTV : currentLTV);
   const healthFactor = formatHealthFactor(isEasyMode ? easyLTV : currentLTV);
+
+  // 🆕 FUNCIÓN PARA RENDERIZAR EL PROGRESO DE TRANSACCIONES
+  const renderTransactionProgress = () => {
+    if (!isLoading) return null;
+
+    const { currentTransaction, totalTransactions, needsApproval } = progressInfo;
+
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <div className="flex items-center justify-between mb-2">
+          <h5 className="font-semibold text-blue-900 flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            Transaction Progress
+          </h5>
+          <span className="text-blue-600 text-sm font-bold">
+            {currentTransaction}/{totalTransactions}
+          </span>
+        </div>
+        
+        {/* Progress Bar */}
+        <div className="w-full bg-blue-200 rounded-full h-2 mb-2">
+          <div 
+            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${(currentTransaction / totalTransactions) * 100}%` }}
+          ></div>
+        </div>
+
+        {/* Current Step */}
+        <div className="text-xs text-blue-700">
+          {step === 'checking' && (
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3 animate-spin" />
+              Validating transaction parameters...
+            </div>
+          )}
+          {step === 'validating' && (
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3 animate-spin" />
+              Checking balances and allowances...
+            </div>
+          )}
+          {step === 'approving' && (
+            <div className="flex items-center gap-1">
+              <CheckCircle className="w-3 h-3 animate-spin" />
+              Sign approval transaction ({currentTransaction}/{totalTransactions})
+            </div>
+          )}
+          {step === 'creating' && (
+            <div className="flex items-center gap-1">
+              <Zap className="w-3 h-3 animate-spin" />
+              {needsApproval ? 
+                `Creating position (${currentTransaction}/${totalTransactions})` : 
+                'Creating position...'
+              }
+            </div>
+          )}
+        </div>
+
+        {/* Next Step Preview */}
+        {needsApproval && step === 'approving' && (
+          <div className="mt-2 p-2 bg-blue-100 rounded text-xs text-blue-600">
+            ℹ️ Next: Sign transaction to create your position (automatically triggered)
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className={`relative p-0 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden ${className}`}>
@@ -722,6 +791,9 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                   </div>
                 </div>
 
+                {/* 🆕 PROGRESO DE TRANSACCIONES */}
+                {renderTransactionProgress()}
+
                 {/* Error Display */}
                 {error && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-3">
@@ -867,6 +939,9 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                   </div>
                 )}
 
+                {/* 🆕 PROGRESO DE TRANSACCIONES PARA EXPERT MODE */}
+                {renderTransactionProgress()}
+
                 {/* Error Display for Expert Mode */}
                 {error && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-3">
@@ -926,19 +1001,31 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                     {step === 'checking' && (
                       <>
                         <Clock className="w-4 h-4 animate-spin" />
-                        Checking balances...
+                        Checking...
+                      </>
+                    )}
+                    {step === 'validating' && (
+                      <>
+                        <Clock className="w-4 h-4 animate-spin" />
+                        Validating...
                       </>
                     )}
                     {step === 'approving' && (
                       <>
                         <CheckCircle className="w-4 h-4 animate-spin" />
-                        Approving collateral...
+                        {progressInfo.needsApproval ? 
+                          `Approve (${progressInfo.currentTransaction}/${progressInfo.totalTransactions})` : 
+                          'Approving...'
+                        }
                       </>
                     )}
                     {step === 'creating' && (
                       <>
                         <Zap className="w-4 h-4 animate-spin" />
-                        Creating position...
+                        {progressInfo.needsApproval ? 
+                          `Creating (${progressInfo.currentTransaction}/${progressInfo.totalTransactions})` : 
+                          'Creating...'
+                        }
                       </>
                     )}
                   </>

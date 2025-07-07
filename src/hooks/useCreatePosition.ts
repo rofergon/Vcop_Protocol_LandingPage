@@ -4,7 +4,7 @@
  * @version 2025 - Compatible con las últimas versiones - FLEXIBLE VERSION
  */
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { 
   useAccount, 
   useReadContract, 
@@ -60,6 +60,11 @@ export interface CreatePositionState {
   positionId: bigint | null
   txHash: Hash | null
   step: 'idle' | 'checking' | 'validating' | 'approving' | 'creating' | 'completed'
+  // 🆕 NUEVOS CAMPOS PARA TRACKING DETALLADO
+  transactionStep: number // 0: inicial, 1: approve, 2: createLoan
+  totalTransactions: number // Total de transacciones necesarias
+  approveHash: Hash | null // Hash de la transacción approve
+  needsApproval: boolean // Si necesita approval o puede crear directamente
 }
 
 export interface AssetPrice {
@@ -134,8 +139,15 @@ export function useCreatePosition({
     success: false,
     positionId: null,
     txHash: null,
-    step: 'idle'
+    step: 'idle',
+    transactionStep: 0,
+    totalTransactions: 1,
+    approveHash: null,
+    needsApproval: false
   })
+
+  // 🆕 REF PARA GUARDAR LOS TÉRMINOS DEL PRÉSTAMO
+  const pendingLoanTermsRef = useRef<LoanTerms | null>(null)
 
   // Wagmi v2 hooks
   const { address, isConnected } = useAccount()
@@ -462,12 +474,18 @@ export function useCreatePosition({
       success: false,
       positionId: null,
       txHash: null,
-      step: 'idle'
+      step: 'idle',
+      transactionStep: 0,
+      totalTransactions: 1,
+      approveHash: null,
+      needsApproval: false
     })
+    // 🆕 LIMPIAR TÉRMINOS PENDIENTES
+    pendingLoanTermsRef.current = null
   }, [])
 
   // ===================================
-  // 🎯 FUNCIÓN PRINCIPAL - AHORA FLEXIBLE
+  // 🎯 FUNCIÓN PRINCIPAL - MEJORADA CON FLUJO AUTOMÁTICO
   // ===================================
 
   const createPosition = useCallback(async (customParams: CreatePositionParams = {}) => {
@@ -486,7 +504,8 @@ export function useCreatePosition({
         isLoading: true, 
         error: null, 
         step: 'checking',
-        success: false
+        success: false,
+        transactionStep: 0
       })
 
       // Step 1: Combinar parámetros por defecto con los del usuario
@@ -562,6 +581,9 @@ export function useCreatePosition({
         duration: params.duration
       }
 
+      // 🆕 GUARDAR TÉRMINOS PARA USO POSTERIOR
+      pendingLoanTermsRef.current = finalTerms
+
       console.log('📋 Final loan terms:', finalTerms)
 
       // Step 5: Verificar allowance y aprobar si es necesario
@@ -574,7 +596,15 @@ export function useCreatePosition({
 
       const allowance = (currentAllowance as bigint) || 0n
       if (allowance < finalTerms.collateralAmount) {
-        updateState({ step: 'approving' })
+        // 🆕 CONFIGURAR FLUJO DE 2 TRANSACCIONES
+        updateState({ 
+          step: 'approving',
+          needsApproval: true,
+          totalTransactions: 2,
+          transactionStep: 1
+        })
+        
+        console.log('💰 Starting approve transaction (1/2)...')
         
         approve({
           address: params.collateralAsset,
@@ -583,8 +613,16 @@ export function useCreatePosition({
           args: [addresses.flexibleLoanManager, finalTerms.collateralAmount]
         })
       } else {
-        // Si ya tiene allowance, crear directamente
-        updateState({ step: 'creating' })
+        // 🆕 CONFIGURAR FLUJO DE 1 TRANSACCIÓN
+        updateState({ 
+          step: 'creating',
+          needsApproval: false,
+          totalTransactions: 1,
+          transactionStep: 1
+        })
+        
+        console.log('💰 Creating loan directly (1/1)...')
+        
         createLoan({
           address: addresses.flexibleLoanManager,
           abi: FlexibleLoanManagerABI,
@@ -604,66 +642,73 @@ export function useCreatePosition({
   }, [isConnected, address, addresses, validateLoanTerms, checkBalances, approve, createLoan])
 
   // ===================================
-  // 🔄 EFECTOS PARA MANEJAR FLUJO
+  // 🔄 EFECTOS MEJORADOS PARA MANEJAR FLUJO AUTOMÁTICO
   // ===================================
 
-  // Manejar confirmación de approve
+  // 🆕 MANEJAR CONFIRMACIÓN DE APPROVE AUTOMÁTICAMENTE
   useEffect(() => {
-    if (isApproveSuccess && state.step === 'approving' && addresses) {
-      updateState({ step: 'creating' })
+    if (isApproveSuccess && state.step === 'approving' && pendingLoanTermsRef.current && addresses) {
+      console.log('✅ Approve confirmed! Automatically executing createLoan (2/2)...')
+      
+      updateState({ 
+        step: 'creating',
+        transactionStep: 2,
+        approveHash: approveHash || null
+      })
 
-      // El createLoan se debe ejecutar con los términos que se usaron en approve
-      // Por ahora usaremos términos por defecto, pero en una implementación real
-      // deberíamos guardar los términos en estado
-      const defaultTerms: LoanTerms = {
-        collateralAsset: addresses.mockETH,
-        loanAsset: addresses.mockUSDC,
-        collateralAmount: parseUnits('1', 18),
-        loanAmount: parseUnits('2000', 6),
-        maxLoanToValue: 800000n,
-        interestRate: 80000n,
-        duration: 0n
-      }
+      // 🆕 USAR LOS TÉRMINOS GUARDADOS (NO HARDCODEADOS)
+      const savedTerms = pendingLoanTermsRef.current
 
       createLoan({
         address: addresses.flexibleLoanManager,
         abi: FlexibleLoanManagerABI,
         functionName: 'createLoan',
-        args: [defaultTerms]
+        args: [savedTerms]
       })
     }
-  }, [isApproveSuccess, state.step, createLoan, addresses])
+  }, [isApproveSuccess, state.step, createLoan, addresses, approveHash])
 
   // Manejar confirmación de createLoan
   useEffect(() => {
     if (isCreateLoanSuccess && state.step === 'creating') {
+      console.log('🎉 Position created successfully!')
+      
       updateState({ 
         step: 'completed',
         success: true,
         isLoading: false,
         txHash: createLoanHash
       })
+      
+      // 🆕 LIMPIAR TÉRMINOS PENDIENTES AL COMPLETAR
+      pendingLoanTermsRef.current = null
     }
   }, [isCreateLoanSuccess, state.step, createLoanHash])
 
   // Manejar errores
   useEffect(() => {
     if (approveError) {
+      console.error('❌ Approve failed:', approveError)
       updateState({
         error: `Approve failed: ${approveError.message}`,
         isLoading: false,
         step: 'idle'
       })
+      // 🆕 LIMPIAR TÉRMINOS PENDIENTES EN ERROR
+      pendingLoanTermsRef.current = null
     }
   }, [approveError])
 
   useEffect(() => {
     if (createLoanError) {
+      console.error('❌ Create loan failed:', createLoanError)
       updateState({
         error: `Create loan failed: ${createLoanError.message}`,
         isLoading: false,
         step: 'idle'
       })
+      // 🆕 LIMPIAR TÉRMINOS PENDIENTES EN ERROR
+      pendingLoanTermsRef.current = null
     }
   }, [createLoanError])
 
@@ -722,11 +767,11 @@ export function useCreatePosition({
   }, [addresses, validateLoanTerms, getAssetPrice])
 
   // ===================================
-  // 🎯 RETORNO DEL HOOK
+  // 🎯 RETORNO DEL HOOK CON MEJORAS
   // ===================================
 
   return {
-    // Estado principal
+    // Estado principal (con nuevos campos)
     ...state,
     
     // Funciones principales
@@ -758,9 +803,19 @@ export function useCreatePosition({
       } : null
     },
     
-    // Estados de transacciones
+    // Estados de transacciones (mejorados)
     isApprovePending: isApprovePending || isApproveConfirming,
     isCreateLoanPending: isCreateLoanPending || isCreateLoanConfirming,
+    
+    // 🆕 INFORMACIÓN DETALLADA DEL PROGRESO
+    progressInfo: {
+      currentTransaction: state.transactionStep,
+      totalTransactions: state.totalTransactions,
+      needsApproval: state.needsApproval,
+      approveHash: state.approveHash,
+      isApproving: state.step === 'approving',
+      isCreating: state.step === 'creating'
+    },
     
     // Info de wallet
     isConnected,

@@ -15,7 +15,9 @@ import {
   CheckCircle,
   Clock,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Loader2,
+  Hash
 } from 'lucide-react';
 import { useAppKit } from '@reown/appkit/react';
 import { useCreatePosition } from '../../hooks/useCreatePosition';
@@ -52,7 +54,7 @@ export const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnec
   // Hook centralizado de direcciones
   const { addresses, isReady: addressesReady, getAssetSymbol } = useContractAddresses();
 
-  // Hook para crear posiciones
+  // Hook para crear posiciones (MEJORADO)
   const {
     createPosition,
     resetState,
@@ -64,7 +66,9 @@ export const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnec
     balanceInfo,
     isApprovePending,
     isCreateLoanPending,
-    refetchBalances
+    refetchBalances,
+    // 🆕 NUEVA INFORMACIÓN DE PROGRESO
+    progressInfo
   } = useCreatePosition({
     autoVerifyBalances: true
   });
@@ -158,6 +162,160 @@ export const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnec
   // Calculate risk metrics based on current LTV
   const riskLevel = calculateRiskLevel(isEasyMode ? easyLTV : currentLTV);
   const healthFactor = formatHealthFactor(isEasyMode ? easyLTV : currentLTV);
+
+  // 🆕 FUNCIÓN PARA RENDERIZAR EL PROGRESO DE TRANSACCIONES
+  const renderTransactionProgress = () => {
+    if (!isLoading) return null;
+
+    const { currentTransaction, totalTransactions, needsApproval, isApproving, isCreating } = progressInfo;
+
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <div className="flex items-center justify-between mb-2">
+          <h5 className="font-semibold text-blue-900 flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Transaction Progress
+          </h5>
+          <span className="text-blue-600 text-sm font-bold">
+            {currentTransaction}/{totalTransactions}
+          </span>
+        </div>
+        
+        {/* Progress Bar */}
+        <div className="w-full bg-blue-200 rounded-full h-2 mb-2">
+          <div 
+            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${(currentTransaction / totalTransactions) * 100}%` }}
+          ></div>
+        </div>
+
+        {/* Current Step */}
+        <div className="text-xs text-blue-700">
+          {step === 'checking' && (
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3 animate-spin" />
+              Validating transaction parameters...
+            </div>
+          )}
+          {step === 'validating' && (
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3 animate-spin" />
+              Checking balances and allowances...
+            </div>
+          )}
+          {step === 'approving' && (
+            <div className="flex items-center gap-1">
+              <CheckCircle className="w-3 h-3 animate-spin" />
+              Sign approval transaction ({currentTransaction}/{totalTransactions})
+              {progressInfo.approveHash && (
+                <a
+                  href={`https://subnets-test.avax.network/c-chain/tx/${progressInfo.approveHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800 ml-1"
+                >
+                  <Hash className="w-3 h-3" />
+                </a>
+              )}
+            </div>
+          )}
+          {step === 'creating' && (
+            <div className="flex items-center gap-1">
+              <Zap className="w-3 h-3 animate-spin" />
+              {needsApproval ? 
+                `Creating position (${currentTransaction}/${totalTransactions})` : 
+                'Creating position...'
+              }
+            </div>
+          )}
+        </div>
+
+        {/* Next Step Preview */}
+        {needsApproval && step === 'approving' && (
+          <div className="mt-2 p-2 bg-blue-100 rounded text-xs text-blue-600">
+            ℹ️ Next: Sign transaction to create your position
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // 🆕 FUNCIÓN PARA RENDERIZAR EL ESTADO DEL BOTÓN
+  const renderButtonContent = () => {
+    if (isLoading) {
+      switch (step) {
+        case 'checking':
+          return (
+            <>
+              <Clock className="w-3 h-3 animate-spin" />
+              Checking...
+            </>
+          );
+        case 'validating':
+          return (
+            <>
+              <Clock className="w-3 h-3 animate-spin" />
+              Validating...
+            </>
+          );
+        case 'approving':
+          return (
+            <>
+              <CheckCircle className="w-3 h-3 animate-spin" />
+              {progressInfo.needsApproval ? 
+                `Approve (${progressInfo.currentTransaction}/${progressInfo.totalTransactions})` : 
+                'Approving...'
+              }
+            </>
+          );
+        case 'creating':
+          return (
+            <>
+              <Zap className="w-3 h-3 animate-spin" />
+              {progressInfo.needsApproval ? 
+                `Creating (${progressInfo.currentTransaction}/${progressInfo.totalTransactions})` : 
+                'Creating...'
+              }
+            </>
+          );
+        default:
+          return (
+            <>
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Processing...
+            </>
+          );
+      }
+    } else if (success) {
+      return (
+        <>
+          <CheckCircle className="w-3 h-3" />
+          Created!
+          {txHash && (
+            <ExternalLink 
+              className="w-3 h-3 cursor-pointer" 
+              onClick={() => window.open(`https://subnets-test.avax.network/c-chain/tx/${txHash}`, '_blank')}
+            />
+          )}
+        </>
+      );
+    } else if (error) {
+      return (
+        <>
+          <AlertTriangle className="w-3 h-3" />
+          Try Again
+        </>
+      );
+    } else {
+      return (
+        <>
+          <Zap className="w-3 h-3" />
+          Create Position
+          <ArrowRight className="w-3 h-3" />
+        </>
+      );
+    }
+  };
 
   return (
     <div className="relative p-0 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
@@ -311,18 +469,18 @@ export const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnec
                       Loan
                     </h5>
                     
-                                          <AssetDropdown
-                        value={loanAsset}
-                        onChange={setLoanAsset}
-                        options={[
-                          { value: "USDC", label: "USDC" },
-                          { value: "VCOP", label: "VCOP" },
-                          { value: "ETH", label: "ETH" },
-                          { value: "WGOLD", label: "WGOLD" }
-                        ]}
-                        borderColor="border-emerald-300"
-                        className="mb-1"
-                      />
+                    <AssetDropdown
+                      value={loanAsset}
+                      onChange={setLoanAsset}
+                      options={[
+                        { value: "USDC", label: "USDC" },
+                        { value: "VCOP", label: "VCOP" },
+                        { value: "ETH", label: "ETH" },
+                        { value: "WGOLD", label: "WGOLD" }
+                      ]}
+                      borderColor="border-emerald-300"
+                      className="mb-1"
+                    />
                     
                     <div className="bg-emerald-100 p-1 rounded text-center mb-1">
                       <div className="text-xs font-bold text-emerald-900 flex items-center justify-center gap-1">
@@ -428,6 +586,9 @@ export const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnec
                   </div>
                 )}
 
+                {/* 🆕 PROGRESO DE TRANSACCIONES */}
+                {renderTransactionProgress()}
+
                 {/* Error/Success Display Compacto */}
                 {error && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-2">
@@ -531,10 +692,78 @@ export const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnec
                     <span className="text-sm font-bold text-blue-900">{currentLTV.toFixed(2)}%</span>
                   </div>
                 </div>
+
+                {/* 🆕 PROGRESO DE TRANSACCIONES PARA EXPERT MODE */}
+                {renderTransactionProgress()}
+
+                {/* Balance Information for Expert Mode */}
+                {balanceInfo.eth && balanceInfo.usdc && (
+                  <div className="bg-blue-50 rounded-lg p-2 border border-blue-200">
+                    <div className="flex items-center justify-between mb-1">
+                      <h5 className="text-xs font-semibold text-blue-900 flex items-center gap-1">
+                        <Wallet className="w-3 h-3" />
+                        💰 Balances
+                      </h5>
+                      <button onClick={refetchBalances} className="text-xs text-blue-600 hover:text-blue-800">
+                        <RefreshCw className="w-3 h-3" />
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-1 text-xs">
+                      <div className="text-center bg-white p-1 rounded">
+                        <div className="font-bold text-gray-900">{parseFloat(balanceInfo.eth.formatted).toFixed(4)} ETH</div>
+                        <div className={balanceInfo.eth.sufficient ? 'text-green-600' : 'text-red-600'}>
+                          {balanceInfo.eth.sufficient ? '✅' : '❌'}
+                        </div>
+                      </div>
+                      <div className="text-center bg-white p-1 rounded">
+                        <div className="font-bold text-gray-900">{parseFloat(balanceInfo.usdc.formatted).toFixed(2)} USDC</div>
+                        <div className={balanceInfo.usdc.sufficient ? 'text-green-600' : 'text-red-600'}>
+                          {balanceInfo.usdc.sufficient ? '✅' : '❌'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error Display for Expert Mode */}
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1 text-red-800">
+                        <AlertTriangle className="w-3 h-3" />
+                        <span className="text-xs font-semibold">Error</span>
+                      </div>
+                      <button onClick={resetState} className="text-xs text-red-600 hover:text-red-800">Reset</button>
+                    </div>
+                    <p className="text-red-700 text-xs mt-1">{error}</p>
+                  </div>
+                )}
+
+                {/* Success Display for Expert Mode */}
+                {success && txHash && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1 text-green-800">
+                        <CheckCircle className="w-3 h-3" />
+                        <span className="text-xs font-semibold">Success!</span>
+                      </div>
+                      <a 
+                        href={`https://subnets-test.avax.network/c-chain/tx/${txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-green-600 hover:text-green-800"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                    <p className="text-green-700 text-xs">Position created successfully!</p>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Action Buttons Compactos */}
+            {/* Action Buttons Mejorados */}
             <div className="flex gap-2 pt-2 border-t border-gray-200">
               <button
                 onClick={handleCreatePosition}
@@ -549,50 +778,7 @@ export const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnec
                     : 'bg-emerald-500 hover:bg-emerald-600 text-white'
                 }`}
               >
-                {isLoading ? (
-                  <>
-                    {step === 'checking' && (
-                      <>
-                        <Clock className="w-3 h-3 animate-spin" />
-                        Checking...
-                      </>
-                    )}
-                    {step === 'approving' && (
-                      <>
-                        <CheckCircle className="w-3 h-3 animate-spin" />
-                        Approving...
-                      </>
-                    )}
-                    {step === 'creating' && (
-                      <>
-                        <Zap className="w-3 h-3 animate-spin" />
-                        Creating...
-                      </>
-                    )}
-                  </>
-                ) : success ? (
-                  <>
-                    <CheckCircle className="w-3 h-3" />
-                    Created!
-                    {txHash && (
-                      <ExternalLink 
-                        className="w-3 h-3 cursor-pointer" 
-                        onClick={() => window.open(`https://subnets-test.avax.network/c-chain/tx/${txHash}`, '_blank')}
-                      />
-                    )}
-                  </>
-                ) : error ? (
-                  <>
-                    <AlertTriangle className="w-3 h-3" />
-                    Try Again
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-3 h-3" />
-                    Create Position
-                    <ArrowRight className="w-3 h-3" />
-                  </>
-                )}
+                {renderButtonContent()}
               </button>
               
               <button 
@@ -608,6 +794,7 @@ export const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnec
                   }
                 }}
                 className="flex-1 border border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-semibold py-2 px-3 text-xs rounded transition-colors flex items-center justify-center gap-1"
+                disabled={isLoading}
               >
                 <RefreshCw className="w-3 h-3" />
                 Reset
