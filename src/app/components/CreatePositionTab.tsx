@@ -134,6 +134,17 @@ export const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnec
     }
   };
 
+  // 🆕 FUNCIÓN PARA MANEJAR EL BOTÓN PRINCIPAL
+  const handleMainButtonClick = () => {
+    if (success && txHash) {
+      // Si la transacción fue exitosa, abrir explorador de bloques
+      window.open(`https://subnets-test.avax.network/c-chain/tx/${txHash}`, '_blank');
+    } else {
+      // Si no, crear posición normalmente
+      handleCreatePosition();
+    }
+  };
+
   const calculateLoanFromLTV = () => {
     const collateralValue = easyCollateralAmount * assetPrices[collateralAsset as keyof typeof assetPrices];
     return (collateralValue * easyLTV / 100) / assetPrices[loanAsset as keyof typeof assetPrices];
@@ -290,13 +301,8 @@ export const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnec
       return (
         <>
           <CheckCircle className="w-3 h-3" />
-          Created!
-          {txHash && (
-            <ExternalLink 
-              className="w-3 h-3 cursor-pointer" 
-              onClick={() => window.open(`https://subnets-test.avax.network/c-chain/tx/${txHash}`, '_blank')}
-            />
-          )}
+          View Transaction
+          <ExternalLink className="w-3 h-3" />
         </>
       );
     } else if (error) {
@@ -766,7 +772,7 @@ export const CreatePositionTab: React.FC<{ isConnected: boolean }> = ({ isConnec
             {/* Action Buttons Mejorados */}
             <div className="flex gap-2 pt-2 border-t border-gray-200">
               <button
-                onClick={handleCreatePosition}
+                onClick={handleMainButtonClick}
                 disabled={isLoading}
                 className={`flex-1 font-semibold py-2 px-3 text-xs rounded transition-colors flex items-center justify-center gap-1 ${
                   isLoading

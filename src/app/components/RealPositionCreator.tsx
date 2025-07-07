@@ -320,6 +320,17 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
     }
   };
 
+  // 🆕 FUNCIÓN PARA MANEJAR EL BOTÓN PRINCIPAL
+  const handleMainButtonClick = () => {
+    if (success && txHash) {
+      // Si la transacción fue exitosa, abrir explorador de bloques
+      window.open(`https://subnets-test.avax.network/c-chain/tx/${txHash}`, '_blank');
+    } else {
+      // Si no, crear posición normalmente
+      handleCreatePosition();
+    }
+  };
+
   const calculateLoanFromLTV = () => {
     const collateralValue = easyCollateralAmount * assetPrices[collateralAsset as keyof typeof assetPrices];
     return (collateralValue * easyLTV / 100) / assetPrices[loanAsset as keyof typeof assetPrices];
@@ -984,7 +995,7 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-gray-200">
               <button
-                onClick={handleCreatePosition}
+                onClick={handleMainButtonClick}
                 disabled={isLoading}
                 className={`flex-1 font-semibold py-3 px-4 text-sm rounded-lg transition-colors flex items-center justify-center gap-2 ${
                   isLoading
@@ -1032,13 +1043,8 @@ export const RealPositionCreator: React.FC<{ className?: string }> = ({ classNam
                 ) : success ? (
                   <>
                     <CheckCircle className="w-4 h-4" />
-                    Position Created!
-                    {txHash && (
-                      <ExternalLink 
-                        className="w-4 h-4 cursor-pointer" 
-                        onClick={() => window.open(`https://subnets-test.avax.network/c-chain/tx/${txHash}`, '_blank')}
-                      />
-                    )}
+                    View Transaction
+                    <ExternalLink className="w-4 h-4" />
                   </>
                 ) : error ? (
                   <>
